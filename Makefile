@@ -74,3 +74,6 @@ printvar-%: ## Print one Makefile variable.
 .DEFAULT_GOAL := help
 
 
+.PHONY:
+push-image:
+	apptainer push -U ubuntu22.04_turbovnc.sif oras://ghcr.io/maouw/ubuntu22.04_turbovnc 

@@ -2,46 +2,176 @@ Bootstrap: docker
 From: ubuntu:20.04
 
 %post
-    export DEBIAN_FRONTEND=noninteractive
-    export TZ=America/Los_Angeles
+	set -e
+	export DEBIAN_FRONTEND=noninteractive
+	export TZ='America/Los_Angeles'
+	export LANG=C.UTF-8
+	export LC_ALL=C.UTF-8
+
+	# Don't generate these locales:
+	mkdir -p /var/lib/locales/supported.d
+	for localename in fr de zh-hant ja es it zh-hans pt ru ar; do
+		rm -f /var/lib/locales/supported.d/$localename && \
+		touch /var/lib/locales/supported.d/$localename && \
+		chmod a-r /var/lib/locales/supported.d/$localename
+	done
+	
     echo "deb http://security.ubuntu.com/ubuntu focal main universe" >> /etc/apt/sources.list
     echo "deb http://security.ubuntu.com/ubuntu focal-updates main universe" >> /etc/apt/sources.list
     echo "deb http://security.ubuntu.com/ubuntu focal-security main universe" >> /etc/apt/sources.list
     echo "deb http://security.ubuntu.com/ubuntu focal-backports main universe" >> /etc/apt/sources.list
     dpkg --add-architecture i386
-    apt-get update
-    apt-get install -y locales
+
+	# Install GitHub CLI:
+	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+	chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+	apt-get update --quiet && apt-get install --yes --quiet gh
+
+	# Install en_US.UTF-8 locale:
+	apt-get install --yes --no-install-recommends --quiet locales && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+
     # Install dependencies for Lmod
-    apt-get install -y lua5.3 lua-bit32 lua-posix lua-posix-dev liblua5.3-0 liblua5.3-dev \
-        tcl tcl-dev tcl8.6 tcl8.6-dev
+    apt-get install --yes --quiet \
+		lua5.3 \
+		lua-bit32 \
+		lua-posix \
+		lua-posix-dev \
+		liblua5.3-0 \
+		liblua5.3-dev \
+        tcl \
+		tcl-dev \
+		tcl8.6 \
+		tcl8.6-dev
+	
     # Install dependencies for building with apptainer
-    apt-get install -y fakeroot e2fsprogs fuse-overlayfs squashfs-tools squashfuse libc6 \
-        zlib1g libseccomp2 libfuse3-3 cryptsetup-bin
+    apt-get install -y \
+		fakeroot \
+		e2fsprogs \
+		fuse-overlayfs \
+		squashfs-tools \
+		squashfuse \
+		libc6 \
+        zlib1g \
+		libseccomp2 \
+		libfuse3-3 \
+		cryptsetup-bin
+	
     # Install XFCE and GUI programs
-    apt-get install -y --install-recommends xfce4 xfce4-goodies xfce4-terminal gdm3- lightdm-
-    apt-get install -y tigervnc-standalone-server tigervnc-xorg-extension
-    apt-get install -y xserver-xorg-video-dummy xserver-xorg-input-void \
-        xserver-xorg-core xinit x11-xserver-utils xfonts-base \
-        xfonts-100dpi xfonts-75dpi x11-xkb-utils libx11-dev
+    apt-get install --yes --quiet --install-recommends \
+		xfce4 \
+		xfce4-goodies \
+		xfce4-terminal \
+		gdm3- \
+		lightdm-
+    
+	apt-get install -y \
+		xserver-xorg-video-dummy \
+		xserver-xorg-input-void \
+        xserver-xorg-core \
+		xinit \
+		x11-xserver-utils \
+		xfonts-base \
+        xfonts-100dpi \
+		xfonts-75dpi \
+		x11-xkb-utils \
+		libx11-dev
+	
     # Cleanup startup
     rm /etc/xdg/autostart/xscreensaver.desktop
     rm /etc/xdg/autostart/pulseaudio.desktop
-    update-alternatives --install /bin/sh sh /bin/bash 20
-    # Lmod on HYAK Klone expects lua cpath at /usr/lib64 (rhel8)
-    mkdir -p /usr/lib64/lua/5.3
-    ln -s /usr/lib/x86_64-linux-gnu/lua/5.3/posix.so /usr/lib64/lua/5.3/posix.so
-    # Set locale
-    locale-gen en_US.UTF-8
+
+    # update-alternatives --install /bin/sh sh /bin/bash 20
+    
+	# Lmod on HYAK Klone expects lua cpath at /usr/lib64 (rhel8)
+    mkdir -p /usr/lib64/lua/5.3 && ln -s /usr/lib/x86_64-linux-gnu/lua/5.3/posix.so /usr/lib64/lua/5.3/posix.so
+
+	set +e
+	# Install TurboVNC dependencies:
+	apt-get install --yes --quiet \
+		libpam0g \
+		libxt6 \
+		libxext6 \
+		xauth \
+		x11-xkb-utils \
+		xkb-data \
+		libturbojpeg
+	
+	# Install TurboVNC:
+	wget https://sourceforge.net/projects/turbovnc/files/3.0.91%20%283.1%20beta2%29/turbovnc_3.0.91_amd64.deb && dpkg -i turbovnc_3.0.91_amd64.deb && rm turbovnc_3.0.91_amd64.deb && apt-get install --fix-broken -y -q
+
+	set -e # Re-enable exit on error
+
+	# Install additional packages for XFCE GUI:
+	# <TODO> - Remove packages that overlap with above
+	apt-get install -y -qq --no-install-recommends \
+		at-spi2-core \
+		bzip2 \
+		dbus \
+		dbus-x11 \
+		desktop-base \
+		desktop-file-utils \
+		evince \
+		file-roller \
+		fontconfig \
+		fontconfig-config \
+		fonts-dejavu-core \
+		fonts-droid-fallback \
+		fonts-freefont-ttf \
+		fonts-liberation \
+		fonts-noto-mono \
+		fonts-opensymbol \
+		fonts-powerline \
+		fonts-urw-base35 \
+		bash-completion \
+		curl \
+		findutils \
+		gawk \
+		git \
+		iproute2 \
+		less \
+		locales \
+		make \
+		nano \
+		net-tools \
+		netcat-openbsd \
+		openssh-client \
+		procps \
+		psmisc \
+		python3 \
+		python3-pip \
+		python3-setuptools \
+		python3-venv \
+		python3-wheel \
+		vim \
+		wget
+	
+
+	# Set up TurboVNC's base directory to be in the container's /vnc directory:
+	echo '$vncUserDir = "$ENV{HYAKVNC_USER_BASE_DIR}";' >> /etc/turbovncserver.conf
+
+	# Clean up packages:
+	apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
+
 
 # Set PATH and envrionment variables
 %environment
     # Fix "cannot find crti.o" bug
     export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu
     export DBUS_SESSION_BUS_ADDRESS=""
-    export LANG='en_US.UTF-8'
-    export LANGUAGE='en_US:en'
-    export LC_ALL='en_US.UTF-8'
+	export LANG=C.UTF-8
+	export LC_ALL=C.UTF-8
+	export VNC_DEFAULT_PASSWORD="password"
+	export PATH="/opt/TurboVNC/bin:$PATH"
+	export TVNC_WM=xfce
+	export HYAKVNC_USER_BASE_DIR="/vnc"
+	export HYAKVNC_USER_SOCKET="${HYAKVNC_USER_BASE_DIR}/socket.uds"
+	export HYAKVNC_USER_LOGFILE="${HYAKVNC_USER_BASE_DIR}/vnc.log"
+	export HYAKVNC_USER_PASSWORDFILE="${HYAKVNC_USER_BASE_DIR}/passwd"
+	export HYAKVNC_USER_DISPLAY=":1"
+	export SHELL="${SHELL:-/bin/bash}"
 
 %labels
     Author hansemro@outlook.com
-    Version v0.1-Ubuntu-20.04
+	Author altan@uw.edu
+    Version v0.2-Ubuntu-20.04
