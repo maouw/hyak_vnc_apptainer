@@ -11,7 +11,7 @@ From: ubuntu:22.04
 		IMAGE_VCS_URL="${IMAGE_VCS_URL:-$(git config --get remote.origin.url || true)}"
 		[ -z "${IMAGE_URL:-}" ] && [ -n "${IMAGE_VCS_URL:-}" ] && IMAGE_URL="${IMAGE_VCS_URL%%.git}"
 		IMAGE_VCS_REF="${IMAGE_VCS_REF:-$(git rev-parse --short HEAD || true)}"
-
+		
 		command -v sed >/dev/null 2>&1 && IMAGE_TAG="${IMAGE_TAG:-"$(git tag --points-at HEAD --list '*@*' --sort=-"creatordate:iso" | sed 's/.*@//;1q')"}"
 		IMAGE_TAG="${IMAGE_TAG:-latest}"
 		IMAGE_TITLE="${IMAGE_TITLE:-"${PWD##*/}"}"
@@ -42,7 +42,7 @@ From: ubuntu:22.04
 	export LC_COLLATE=C
 	export SHELL="${SHELL:-/bin/bash}"
 	export PATH="/opt/TurboVNC/bin:${PATH}"
-	export TVNC_WM=xfce-hyakvnc
+	export TVNC_WM=/usr/bin/openbox-session
 	export HYAKVNC_VNC_PASSWORD="${HYAKVNC_VNC_PASSWORD:-password}"
 	export HYAKVNC_VNC_DISPLAY="${HYAKVNC_VNC_DISPLAY:-:10}"
 	export HYAKVNC_VNC_DIR="${HYAKVNC_VNC_DIR:-/vnc}"
@@ -51,9 +51,9 @@ From: ubuntu:22.04
 	set -e # Exit on error
 	set -x # Print commands as they are executed
 	export DEBIAN_FRONTEND=noninteractive
-
+	
 	apt-get update -y -qq
-	apt-get install -y -qq apt-utils
+	apt-get install apt-utils
 
 	# Don't generate these locales
 	mkdir -p /var/lib/locales/supported.d
@@ -72,7 +72,7 @@ From: ubuntu:22.04
 	export LANG=en_US.utf8
 	export LC_ALL=en_US.utf8
 	export LC_COLLATE=C
-
+	
 	apt-get install -yq \
 		bash-completion \
 		bash-doc \
@@ -94,91 +94,46 @@ From: ubuntu:22.04
 		wget \
 		whiptail \
 		zip
-
+	
 	# Stop apt from installing audio packages (they don't work on VNC):
 	apt-mark hold xfce4-pulseaudio-plugin pavucontrol pulseaudio pipewire pipewire-bin pipewire-pulse
 
-	# Install XFCE and some apps:
+	# Install OperBox and some apps:
 	apt-get install -yq \
-		libxfce4ui-utils \
-		thunar \
-		xfce4-appfinder \
-		xfce4-panel \
- 		xfce4-session \
-		xfce4-settings \
-		xfconf \
-		xfdesktop4 \
-		xfwm4 \
-		desktop-base \
-		tango-icon-theme \
-		elementary-icon-theme \
-		elementary-xfce-icon-theme \
-		greybird-gtk-theme \
-		thunar-volman \
-		xfce4-notifyd \
-		xorg \
-		mousepad \
-		ristretto \
-		thunar-archive-plugin \
- 		xfce4-datetime-plugin \
-		xfce4-screenshooter \
-		xfce4-taskmanager \
-		xfce4-terminal \
-		xfce4-whiskermenu-plugin \
-		xfce4-indicator-plugin \
-		xfce4-notes-plugin \
- 		fonts-dejavu-core \
-		fonts-freefont-ttf \
-		fonts-ubuntu \
-		fonts-powerline \
+		openbox \
+		openbox-menu \
+		xfonts-base \
 		xclip \
 		xdg-utils \
 		xsel \
+		xterm \
 		zenity
 
-	# Set xfce4-terminal as default terminal emulator:
-	update-alternatives --set x-terminal-emulator /usr/bin/xfce4-terminal.wrapper
-
-	# Install dependencies required by FreeSurfer:
+	# Install dependencies required by TurboVNC:
 	apt-get install -yq --no-install-recommends \
-		csh \
-		gettext \
-		language-pack-en \
-		libgomp1 \
-		libjpeg62 \
-		libncurses5 \
-		libquadmath0 \
-		libx11-dev \
-		libxcb-icccm4 \
-		libxcb-image0 \
-		libxcb-keysyms1 \
-		libxcb-render-util0 \
-		libxcb-xinerama0 \
-		libxcb-xinput0 \
-		libxcb-xkb1 \
-		libxkbcommon-x11-0 \
-		tcsh \
-		xorg-dev \
-		xterm
-
-	# Clean up packages:
-	apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
-
+		libpam0g \
+		libxt6 \
+		libxext6 \
+		xauth \
+		x11-xkb-utils \
+		xkb-data
+	
 	# Copy configs:
 	rsync -avi --no-p --no-g --chmod=ugo=rwX /opt/setup/configs/xfce/etc/ /etc/
 	rsync -avi --no-p --no-g --chmod=ugo=rwX /opt/setup/configs/xfce/usr/ /usr/
 
 	# Install TurboVNC:
 	/opt/setup/scripts/install-turbovnc.sh && rm -rf /opt/setup/scripts/install-turbovnc.sh
+	apt-get install --fix-broken -y
 	echo '$vncUserDir = "$ENV{HYAKVNC_VNC_DIR}";' >>/etc/turbovncserver.conf
+	apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
 
-%runscript
-
+%apprun vncserver
 	nodename="$(uname -n)" || nodename="${HOST:-}" || nodename="unknown"
 	APPTAINER_NAME="${APPTAINER_NAME:-hyakvnc-vncserver}"
 	_errecho() { echo "${APPTAINER_NAME:-hyakvnc-vncserver}: ${*}" >&2; }
 	_errexit() { _errecho "${*}"; exit 1; }
-
+	
 	# Set up the VNC directory
 	if [ ! -d "${HYAKVNC_VNC_DIR:-}" ] || [ ! -w "${HYAKVNC_VNC_DIR:-}" ]; then
 		_errecho "VNC directory ${HYAKVNC_VNC_DIR:-} does not exist or is not writable. Will try to use /tmp"
@@ -200,7 +155,7 @@ From: ubuntu:22.04
 	_errecho "Set VNC password to ${HYAKVNC_VNC_PASSWORD:-}"
 	echo "${nodename}" >"${HYAKVNC_VNC_DIR}/hostname" || _errexit "Could not write hostname."
 	printenv >"${HYAKVNC_VNC_DIR}/environment" || _errexit "Could not write environment variables."
-
+	
 	# Set up the vncserver arguments
 	if [ -n "${HYAKVNC_VNC_PORT:-}" ]; then
 		set -- -rfbport "${HYAKVNC_VNC_PORT}" "${@}"
@@ -216,3 +171,12 @@ From: ubuntu:22.04
 	vncserver "$@" || _errexit "vncserver failed (exit code ${?})"
 	trap - INT QUIT TERM TSTP
 	_errecho "Exiting hyakvnc-vncserver"
+
+%apprun vnckill
+	vncserver -kill "${HYAKVNC_VNC_DISPLAY}"
+
+%runscript
+	# Run app vncserver:
+	exec /scif/apps/vncserver/scif/runscript "$@"
+
+
