@@ -1,13 +1,13 @@
 #!/bin/sh
 # Install TurboVNC:
 
-TURBOVNC_VERSION=${TURBOVNC_VERSION:-3.0.91}
+TURBOVNC_VERSION=${TURBOVNC_VERSION:-3.1}
 TURBOVNC_FILES_ROOT="${TURBOVNC_FILES_ROOT:-}"
 TURBOVNC_DOWNLOAD_ROOT="${TURBOVNC_DOWNLOAD_ROOT:-https://sourceforge.net/projects/turbovnc/files}"
 TURBOVNC_DOWNLOAD_URL="${TURBOVNC_DOWNLOAD_URL:-}"
 
-if [ "${TURBOVNC_VERSION}" = "3.0.91" ] && [ -z "${TURBOVNC_FILES_ROOT:-}" ]; then
-	TURBOVNC_FILES_ROOT="3.0.91 (3.1 beta2)"
+if [ "${TURBOVNC_VERSION}" = "3.1" ] && [ -z "${TURBOVNC_FILES_ROOT:-}" ]; then
+	TURBOVNC_FILES_ROOT="3.1"
 fi
 
 if ! command -v curl >/dev/null 2>&1; then

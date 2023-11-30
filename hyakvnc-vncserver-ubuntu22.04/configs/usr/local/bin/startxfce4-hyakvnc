@@ -1,0 +1,12 @@
+#!/bin/sh
+export XKL_XMODMAP_DISABLE=1
+# disable screensaver and power management
+xset -dpms &
+xset s noblank &
+xset s off &
+xsetroot -solid grey
+# vncconfig window enables clipboard sharing
+vncconfig -iconic &
+
+# start desktop environment
+exec startxfce4 "$@"

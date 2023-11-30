@@ -1,0 +1,83 @@
+name: xfce
+source:
+  arguments:
+    optional:
+      recommends: "false"
+      audio: "false"
+  dependencies:
+    apt:
+      - at-spi2-core
+      - bash-completion
+      - bash-doc
+      - bc
+      - binutils
+      - bzip2
+      - ca-certificates
+      - curl
+      - dbus-x11
+      - elementary-xfce-icon-theme
+      - file
+      - fonts-dejavu-core
+      - fonts-freefont-ttf
+      - fonts-powerline
+      - fonts-ubuntu
+      - git
+      - greybird-gtk-theme
+      - less
+      - libxfce4ui-utils
+      - make
+      - mousepad
+      - nano
+      - netcat-openbsd
+      - openssh-client
+      - psmisc
+      - python3
+      - ristretto
+      - rsync
+      - thunar
+      - thunar-archive-plugin
+      - thunar-volman
+      - vim-tiny
+      - wget
+      - whiptail
+      - xclip
+      - xdg-utils
+      - xfce4-appfinder
+      - xfce4-datetime-plugin
+      - xfce4-indicator-plugin
+      - xfce4-notes-plugin
+      - xfce4-notifyd
+      - xfce4-panel
+      - xfce4-screenshooter
+      - xfce4-session
+      - xfce4-settings
+      - xfce4-taskmanager
+      - xfce4-terminal
+      - xfce4-whiskermenu-plugin
+      - xfconf
+      - xfdesktop4
+      - xfwm4
+      - xterm
+      - zip
+  instructions: |
+
+    {%- if self.pkg_manager == "apt" %}
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -qq
+        {%- if self.recommends == "true" %}
+            {% set installOpts = "-y -q" %}
+        {%- else %}
+            {% set installOpts = "-y -q --no-install-recommends" %}
+        {%- endif %}
+        {%- if self.audio != "true" %}
+            apt-mark hold xfce4-pulseaudio-plugin pavucontrol pulseaudio pipewire pipewire-bin pipewire-pulse            
+        {%- else %}
+            {{ self._template["dependencies"]["apt"].append("xfce4-pulseaudio-plugin") }}
+        {%- endif %}
+
+        apt-get install -yq {{installOpts}} {{ " ".join(self._template["dependencies"]["apt"]) }}
+        {%- if self.audio != "true" %}
+            apt-mark unhold xfce4-pulseaudio-plugin pavucontrol pulseaudio pipewire pipewire-bin pipewire-pulse
+        {%- endif %}
+    {%- endif %}
+ 
