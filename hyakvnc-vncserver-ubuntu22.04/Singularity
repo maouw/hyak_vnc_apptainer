@@ -142,6 +142,7 @@ From: ubuntu:22.04
 	rsync -avi --no-p --no-g --chmod=ugo=rwX /opt/setup/configs/ /
 
 	# Move hyakvnc-vncserver.sh to /opt/local/bin:
+	mkdir -p /opt/local/bin
 	mv /opt/setup/scripts/hyakvnc-vncserver.bash /opt/local/bin/hyakvnc-vncserver
 
 	# Erase the setup files:
