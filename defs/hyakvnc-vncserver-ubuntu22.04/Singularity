@@ -6,50 +6,22 @@ From: ubuntu:22.04
 	It is intended to be used as a base for other containers that need a VNC server.
 	It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
 
-%arguments
-	IMAGE_TAG=
-	IMAGE_TITLE=
-	IMAGE_VERSION=
-	IMAGE_URL=
-	IMAGE_VCS_REF=
-	IMAGE_VCS_URL=
-	IMAGE_AUTHOR=
-	IMAGE_AUTHOR_EMAIL=
-	IMAGE_AUTHOR_NAME=
-	IMAGE_VENDOR=University of Washington Department of Psychology
-	IMAGE_DESCRIPTION=
-	IMAGE_DOCUMENTATION=
-
-%setup
-	# shellcheck source=/dev/null
-	. ../_common/scripts/write-apptainer-labels.sh
-
-	IMAGE_TAG="${IMAGE_TAG:-{{IMAGE_TAG}}}"
-	IMAGE_TITLE="${IMAGE_TITLE:-{{IMAGE_TITLE}}}"
-	IMAGE_VERSION="${IMAGE_VERSION:-{{IMAGE_VERSION}}}"
-	IMAGE_URL="${IMAGE_URL:-{{IMAGE_URL}}}"
-	IMAGE_VCS_REF="${IMAGE_VCS_REF:-{{IMAGE_VCS_REF}}}"
-	IMAGE_VCS_URL="${IMAGE_VCS_URL:-{{IMAGE_VCS_URL}}}"
-	IMAGE_AUTHOR="${IMAGE_AUTHOR:-{{IMAGE_AUTHOR}}}"
-	IMAGE_AUTHOR_EMAIL="${IMAGE_AUTHOR_EMAIL:-{{IMAGE_AUTHOR_EMAIL}}}"
-	IMAGE_AUTHOR_NAME="${IMAGE_AUTHOR_NAME:-{{IMAGE_AUTHOR_NAME}}}"
-	IMAGE_VENDOR="${IMAGE_VENDOR:-{{IMAGE_VENDOR}}}"
-	IMAGE_DESCRIPTION="${IMAGE_DESCRIPTION:-{{IMAGE_DESCRIPTION}}}"
-	IMAGE_DOCUMENTATION="${IMAGE_DOCUMENTATION:-{{IMAGE_DOCUMENTATION}}}"
-	write_apptainer_labels || true
-
 %files
-	./configs /opt/setup/configs
-	./scripts /opt/setup/scripts
-
+{
+	../../common/configs/ubuntu /opt/setup/configs
+	../../common/scripts /opt/setup/scripts
+}
 %environment
+{
 	export LANG=en_US.utf8
 	export LC_ALL=en_US.utf8
 	export LC_COLLATE=C
 	export SHELL="${SHELL:-/bin/bash}"
 	export PATH="/opt/local/bin:/opt/TurboVNC/bin:${PATH}"
+}
 
 %post
+{
 	set -e # Exit on error
 	set -x # Print commands as they are executed
 	export DEBIAN_FRONTEND=noninteractive
@@ -57,7 +29,7 @@ From: ubuntu:22.04
 	apt-get update -y -qq
 	apt-get install -y -qq apt-utils
 
-	# Don't generate these locales
+	# Don't generate these locales"
 	mkdir -p /var/lib/locales/supported.d
 	for localename in fr de zh-hant ja es it zh-hans pt ru ar; do
 		touch "/var/lib/locales/supported.d/${localename}" && chmod a-r "/var/lib/locales/supported.d/${localename}"
@@ -68,16 +40,15 @@ From: ubuntu:22.04
 	localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.utf8
 
 	# Set the locale environment variables permanently:
-	export LANG=en_US.utf8 && echo "LANG=\"${LANG}\"" >> /etc/environment
-	export LC_ALL=en_US.utf8 && echo "LC_ALL=\"${LC_ALL}\"" >> /etc/environment
-	export LC_COLLATE=C && echo "LC_COLLATE=\"${LC_COLLATE}\"" >> /etc/environment
+	export LANG=en_US.utf8 && echo "LANG=\"${LANG}\"" >>/etc/environment
+	export LC_ALL=en_US.utf8 && echo "LC_ALL=\"${LC_ALL}\"" >>/etc/environment
+	export LC_COLLATE=C && echo "LC_COLLATE=\"${LC_COLLATE}\"" >>/etc/environment
 
 	# Stop apt from installing audio packages (they don't work on VNC):
 	apt-mark hold xfce4-pulseaudio-plugin pavucontrol pulseaudio pipewire pipewire-bin pipewire-pulse
 
-	# Install XFCE and some apps:
-	apt-get install -yq --no-install-recommends \
-		at-spi2-core \
+	# Install basic packages:
+	apt-get install -yq \
 		bash-completion \
 		bash-doc \
 		bc \
@@ -85,33 +56,43 @@ From: ubuntu:22.04
 		bzip2 \
 		ca-certificates \
 		curl \
-		dbus-x11 \
-		elementary-xfce-icon-theme \
+		dash \
 		file \
-		fonts-dejavu-core \
-		fonts-freefont-ttf \
-		fonts-powerline \
-		fonts-ubuntu \
 		git \
-		greybird-gtk-theme \
 		less \
-		libxfce4ui-utils \
 		make \
-		mousepad \
 		nano \
 		netcat-openbsd \
 		openssh-client \
+		procps \
 		psmisc \
 		python3 \
-		ristretto \
 		rsync \
+		vim-tiny \
+		zip
+
+	# Install XFCE and some apps:
+	apt-get install -yq --no-install-recommends \
+		at-spi2-core \
+		dbus-x11 \
+		elementary-xfce-icon-theme \
+		fonts-dejavu-core \
+		fonts-freefont-ttf \
+		fonts-ubuntu \
+		greybird-gtk-theme \
+		libnotify-bin \
+		libxfce4ui-utils \
+		mousepad \
+		novnc \
+		ristretto \
 		thunar \
 		thunar-archive-plugin \
 		thunar-volman \
-		vim-tiny \
-		wget \
-		whiptail \
+		x11-utils \
+		x11-xserver-utils \
+		xauth \
 		xclip \
+		xdg-user-dirs \
 		xdg-utils \
 		xfce4-appfinder \
 		xfce4-datetime-plugin \
@@ -127,13 +108,16 @@ From: ubuntu:22.04
 		xfce4-whiskermenu-plugin \
 		xfconf \
 		xfdesktop4 \
+		xfonts-base \
 		xfwm4 \
 		xterm \
+		xvfb \
 		zip
+
 	# Set xfce4-terminal as default terminal emulator:
 	update-alternatives --set x-terminal-emulator /usr/bin/xfce4-terminal.wrapper
 
-	# Install TurboVNC:	
+	# Install TurboVNC:
 	/opt/setup/scripts/install-turbovnc.sh
 
 	# shellcheck disable=SC2016
@@ -143,14 +127,21 @@ From: ubuntu:22.04
 
 	# Move hyakvnc-vncserver.sh to /opt/local/bin:
 	mkdir -p /opt/local/bin
-	mv /opt/setup/scripts/hyakvnc-vncserver.bash /opt/local/bin/hyakvnc-vncserver
+	mv /opt/setup/scripts/hyakvnc-vncserver.sh /opt/local/bin/hyakvnc-vncserver
 
 	# Erase the setup files:
 	rm -rf /opt/setup
 
 	# Clean up packages:
 	apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
-
+}
 
 %runscript
+{
 	exec hyakvnc-vncserver "$@"
+}
+
+%startscript
+{
+	exec hyakvnc-vncserver "$@"
+}
