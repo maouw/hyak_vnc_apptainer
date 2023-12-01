@@ -8,6 +8,7 @@ shopt -qs lastpipe inherit_errexit
 PROGNAME="${0##*/}"
 VERBOSE="${VERBOSE:-0}"
 PROG_VERSION="0.0.1"
+SCRIPTDIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" || true
 
 function _errecho() {
 	case "${1:-}" in
@@ -39,6 +40,7 @@ Usage: ${PROGNAME} [options] -- <neurodocker args>
 									Unless --bootstrap is set, a URL is required and the scheme will be used to
 									determine the bootstrap type.)
 		--bootstrap=<type>		(Apptainer only) Set the bootstrap type (default: determed by --base-image)
+		--write-build-labels	Generate build labels for Apptainer automatically
 		--no-nd-base-fix		Do not correct the "base_image" key in the generated output
 									neurodocker limitation as of 0.9.5)
 		--output=<file>			Set the output file instead of printing to stdout
@@ -75,6 +77,7 @@ function main() {
 	local neurodocker_runner
 	local neurodocker_runner_image="repronim/neurodocker:latest"
 	local template_path
+	local -i write_build_labels=0
 	# Parse arguments:
 	(($# == 0)) && { show_help; return 0; }
 	while (($# > 0)); do
@@ -122,12 +125,16 @@ function main() {
 				shift || { log ERROR "$1 requires an argument"; return 1; }
 				bootstrap_type="${1:-}"
 				;;
+			--write-build-labels)
+				write_build_labels=1
+				;;
 			--no-nd-base-fix)
 				no_nd_base_fix=1
 				;;
 			--output) # Set the output file
 				shift || { log ERROR "$1 requires an argument"; return 1; }
 				output_file="${1:-}"
+				mkdir -p "$(dirname "${output_file}")" || { _errecho "Could not create directory \"$(dirname "${output_file}")\". Exiting."; return 1; }
 				;;
 			--neurodocker-runner-image) # Set the neurodocker runner image to use
 				shift || { log ERROR "$1 requires an argument"; return 1; }
@@ -191,6 +198,7 @@ function main() {
 		localimage | file)
 			bootstrap_type="${bootstrap_type:-localimage}"
 			[[ -n "${base_image:-}" ]] || [[ -f "${base_image}" ]] || { _errecho "No file at \"${base_image}\". Exiting."; return 1; }
+			base_image="$(realpath --relative-to="$(dirname "${output_file:-}")" "${base_image}")"
 			;;
 		*)
 			_errecho "Invalid schema \"${base_image_schema}\". Must be one of \"library\", \"oras\", \"docker\", \"shub\", \"localimage\", or \"file\"."
@@ -243,6 +251,15 @@ function main() {
 	[[ -n "${template_path:-}" ]] && neurodocker_args+=(--template-path "${template_path}")
 	neurodocker_args+=("${generate_format}")
 	neurodocker_args+=(--base-image "${base_image}")
+
+	# Add build labels if requested:
+	if [[ "${generate_format}" == "singularity" ]] && [[ "${write_build_labels:-0}" == 1 ]] && [[ -w "$(dirname "${output_file:-}")" ]]; then
+		[[ -x "${SCRIPTDIR}/write-apptainer-labels.sh" ]] || { _errecho "Could not find \"write-apptainer-labels.sh\" in \"${SCRIPTDIR}\". Exiting."; return 1; }
+		"${SCRIPTDIR}/write-apptainer-labels.sh" >"$(dirname "${output_file}")"/build_labels || { _errecho "Could not write build labels. Exiting."; return 1; }
+		neurodocker_args+=(--copy build_labels "/.build_labels")
+	fi
+
+	# If stdin is not a terminal, pass --yes to neurodocker to avoid interactive prompts:
 	[[ -t 0 ]] || neurodocker_args+=(--yes)
 	neurodocker_args+=("$@")
 

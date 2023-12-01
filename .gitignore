@@ -6,3 +6,4 @@
 *.tar.gz
 .setup-downloads/
 .build-arg-file
+sif/

@@ -17,12 +17,12 @@ $(CONTAINERDIR):
 
 # Make targets for each directory that contains a Singularity file
 # (allows you to build a single container with `make <container_name>`):
-SUBDIRS := $(patsubst defs/%/Singularity,%,$(wildcard defs/*/Singularity))
+SUBDIRS := $(patsubst def/%/Singularity,%,$(wildcard def/*/Singularity))
 .PHONY: $(SUBDIRS)
 $(SUBDIRS): %: ${CONTAINERDIR}/%.sif
 
 # Build target for each container:
-${CONTAINERDIR}/%.sif: defs/%/Singularity | $(CONTAINERDIR)
+${CONTAINERDIR}/%.sif: def/%/Singularity | $(CONTAINERDIR)
 ifeq (, $(shell command -v apptainer 2>/dev/null))
 	$(error "No apptainer in $(PATH). If you're on klone, you should be on a compute node")
 endif

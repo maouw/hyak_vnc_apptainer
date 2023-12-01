@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+# shellcheck shell=bash
 set -o pipefail
 
 [[ -n "${XDEBUG:-}" ]] && set -x
@@ -32,7 +32,6 @@ if [[ -z "${comment:-}" ]]; then
 else
 	shift
 fi
-
 
 git_tag_args=()
 git_commit_args=()
