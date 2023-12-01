@@ -6,11 +6,13 @@ From: ubuntu:22.04
 	It is intended to be used as a base for other containers that need a VNC server.
 	It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
 
+%setup
+	[ -n "${APPTAINER_ROOTFS:-}" ] && ../../bin/write-apptainer-labels.sh > "${APPTAINER_ROOTFS}/.build_labels"
+
 %files
-{
 	../../common/configs/ubuntu /opt/setup/configs
 	../../common/scripts /opt/setup/scripts
-}
+
 %environment
 {
 	export LANG=en_US.utf8

@@ -9,32 +9,26 @@ DATETIME_FORMAT := %(%Y-%m-%d %H:%M:%S)T
 .DELETE_ON_ERROR:
 
 # Where to store built containers:
-CONTAINERDIR := $(or $(CONTAINERDIR), $(shell pwd))
+CONTAINERDIR := $(PWD)/sif
 
 # Make sure CONTAINERDIR exists:
 $(CONTAINERDIR):
-	@mkdir -pv $@
+	@mkdir -p $@
 
 # Make targets for each directory that contains a Singularity file
 # (allows you to build a single container with `make <container_name>`):
-SUBDIRS := $(patsubst %/Singularity,%,$(wildcard */Singularity))
+SUBDIRS := $(patsubst defs/%/Singularity,%,$(wildcard defs/*/Singularity))
 .PHONY: $(SUBDIRS)
 $(SUBDIRS): %: ${CONTAINERDIR}/%.sif
 
 # Build target for each container:
-${CONTAINERDIR}/%.sif: %/Singularity | $(CONTAINERDIR)
+${CONTAINERDIR}/%.sif: defs/%/Singularity | $(CONTAINERDIR)
 ifeq (, $(shell command -v apptainer 2>/dev/null))
 	$(error "No apptainer in $(PATH). If you're on klone, you should be on a compute node")
 endif
 	pushd $(<D)
-	apptainer build --fakeroot --fix-perms --warn-unused-build-args --build-arg CONTAINERDIR="$(CONTAINERDIR)" $@ $(<F)
+	apptainer build --fix-perms --warn-unused-build-args $@ $(<F)
 	popd
-	[ -n "$$APPTAINER_PASSPHRASE" ] && echo "$$APPTAINER_PASSPHRASE" | apptainer sign $@
-
-
-# Add dependencies for containers that depend on other containers:
-$(CONTAINERDIR)/ubuntu22.04_turbovnc.sif:: $(CONTAINERDIR)/ubuntu22.04_interactive.sif
-$(CONTAINERDIR)/ubuntu22.04_xubuntu.sif:: $(CONTAINERDIR)/ubuntu22.04_turbovnc.sif
 
 # Targets for printing help:
 .PHONY: help
@@ -70,10 +64,13 @@ printvar-%: ## Print one Makefile variable.
 	@echo '  flavor = $(flavor $*)'
 	@echo '   value = $(value  $*)'
 
+.PHONY: clean
+clean: ## Remove all built containers.
+	rmdir $(CONTAINERDIR)
+
+.PHONY: clean-all
+clean-all: clean ## Remove all built containers and all built images.
+	rm -rfv $(CONTAINERDIR)
 
 .DEFAULT_GOAL := help
 
-
-.PHONY:
-push-image:
-	apptainer push -U ubuntu22.04_turbovnc.sif oras://ghcr.io/maouw/ubuntu22.04_turbovnc 
