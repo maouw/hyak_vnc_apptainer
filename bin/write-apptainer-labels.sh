@@ -1,6 +1,8 @@
 #!/bin/sh
 # shellcheck shell=sh
 
+# Write the build labels to the build labels path for both the org.label-schema and org.opencontainers.image formats
+
 [ -n "${XDEBUG:-}" ] && set -x
 
 write_to_build_labels() {

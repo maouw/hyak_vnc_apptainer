@@ -44,9 +44,9 @@ Usage: ${PROGNAME} [options] -- <neurodocker args>
 		--no-nd-base-fix		Do not correct the "base_image" key in the generated output
 									neurodocker limitation as of 0.9.5)
 		--output=<file>			Set the output file instead of printing to stdout
-		--neurodocker-version	Set the version of neurodocker to use (default: latest)
 		--neurodocker-runner	Set the neurodocker runner to use
 									(default: first of apptainer or docker, options: apptainer, singularity, docker)
+		--neurodocker-image		Set the neurodocker runner image to use
 		--template-path			Set the path to the neurodocker templates (optional)
 		--verbose				Verbose output
 		--trace					Trace output

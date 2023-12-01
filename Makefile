@@ -27,7 +27,7 @@ ifeq (, $(shell command -v apptainer 2>/dev/null))
 	$(error "No apptainer in $(PATH). If you're on klone, you should be on a compute node")
 endif
 	pushd $(<D)
-	apptainer build --fix-perms --warn-unused-build-args $@ $(<F)
+	apptainer build --force --fix-perms --warn-unused-build-args $@ $(<F)
 	popd
 
 # Targets for printing help:
@@ -71,6 +71,8 @@ clean: ## Remove all built containers.
 .PHONY: clean-all
 clean-all: clean ## Remove all built containers and all built images.
 	rm -rfv $(CONTAINERDIR)
+
+$(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif: common/scripts/hyakvnc-vncserver.sh common/scripts/install-turbovnc.sh bin/write-apptainer-labels.sh
 
 .DEFAULT_GOAL := help
 

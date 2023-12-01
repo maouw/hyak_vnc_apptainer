@@ -9,6 +9,23 @@ PROGNAME="${0##*/}"
 VERBOSE="${VERBOSE:-0}"
 PROG_VERSION="0.0.1"
 
+USER="${USER:-$(id -un || true)}"
+HOME="${HOME:-/home/${USER}}"
+HOST="${HOST:-$(uname -n || true)}"
+HOSTNAME="${HOSTNAME:-${HOST}}"
+HOSTTYPE="${HOSTTYPE:-$(uname -m || true)}"
+OSTYPE="${OSTYPE:-$(uname -s || true)}"
+PLATFORM="${PLATFORM:-${OSTYPE}-${HOSTTYPE}}"
+
+export TVNC_WM=${TVNC_WM:-xfce}
+export VNC_PASSWORD="${VNC_PASSWORD:-password}"
+export VNC_DISPLAY="${VNC_DISPLAY:-:10}"
+export VNC_USER_DIR="${VNC_USER_DIR:-/tmp/${USER}-vnc}"
+export VNC_FG="${VNC_FG:-1}"
+export VNC_LOG="${VNC_LOG:-${VNC_USER_DIR}/vnc.log}"
+export VNC_SOCKET="${VNC_SOCKET:-${VNC_USER_DIR}/socket.uds}"
+export VNC_PORT="${VNC_PORT:-}"
+
 function _errecho() {
 	case "${1:-}" in
 		--verbose)
@@ -74,23 +91,15 @@ EOF
 
 function main() {
 	# Parse arguments:
-	(($# == 0)) && { show_help; return 0; }
 	while (($# > 0)); do
 		case ${1:-} in
 			--?*=* | -?*=*) # Handle --flag=value args
 				set -- "${1%%=*}" "${1#*=}" "${@:2}"
 				continue
 				;;
-			--trace)
-				set -o xtrace
-				;;
-			--verbose)
-				export VERBOSE=1
-				;;
-			-h | --help)
-				show_help
-				return 0
-				;;
+			--trace) set -o xtrace ;;
+			--verbose) export VERBOSE=1 ;;
+			-h | --help) show_help; return 0 ;;
 			--version) echo "${PROGNAME} version ${PROG_VERSION:-}"; return 0 ;;
 			--password)
 				shift || { log ERROR "$1 requires an argument"; return 1; }
@@ -117,12 +126,8 @@ function main() {
 				export VNC_PORT="$1"
 				unset VNC_SOCKET
 				;;
-			--foreground | --fg)
-				export VNC_FG=1
-				;;
-			--background | --bg)
-				export VNC_FG=0
-				;;
+			--foreground | --fg) export VNC_FG=1 ;;
+			--background | --bg) export VNC_FG=0 ;;
 			--wm)
 				shift || { log ERROR "$1 requires an argument"; return 1; }
 				export TVNC_WM="$1"
@@ -141,16 +146,6 @@ function main() {
 
 	# Trap errors:
 	trap _errexit ERR
-
-	# Export variables
-	export TVNC_WM=${TVNC_WM:-xfce}
-	export VNC_PASSWORD="${VNC_PASSWORD:-password}"
-	export VNC_DISPLAY="${VNC_DISPLAY:-:10}"
-	export VNC_USER_DIR="${VNC_USER_DIR:-/tmp/${USER}-vnc}"
-	export VNC_FG="${VNC_FG:-1}"
-	export VNC_LOG="${VNC_LOG:-${VNC_USER_DIR}/vnc.log}"
-	export VNC_SOCKET="${VNC_SOCKET:-${VNC_USER_DIR}/socket.uds}"
-	export VNC_PORT="${VNC_PORT:-}"
 
 	_errecho --verbose "Running as \"${USER:-$(id -un || true)}\" with UID \"${UID:-$(id -u || true)}\" and GID \"${GID:-$(id -g || true)}\""
 
@@ -184,6 +179,9 @@ function main() {
 	[[ -n "${VNC_FG:-}" ]] && set -- -fg "${@}"
 	[[ -n "${VNC_LOG:-}" ]] && set -- -log "${VNC_LOG}" "${@}"
 	[[ -n "${VNC_DISPLAY:-}" ]] && set -- "${VNC_DISPLAY}" "${@}"
+
+	[[ -n "${!VNC_@}" ]] && export "${!VNC_@}"
+	[[ -n "${TVNC_WM:-}" ]] && export TVNC_WM="${TVNC_WM}"
 
 	_ERR_WRITE_LOG=1 # Write log on exit
 	retval=0         # Declare retval for exit trap
