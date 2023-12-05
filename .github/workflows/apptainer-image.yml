@@ -33,7 +33,7 @@ jobs:
         DEF_DIR="def/${IMAGE_NAME}"
         [ -d "${DEF_DIR:-}" ] || { echo "No directory found for DEF_DIR at ${DEF_DIR:-}"; exit 1; }
         [ -f "${DEF_DIR}/Singularity" ] || { echo "No definition file found at ${DEF_DIR:-}"; exit 1; }
-        echo "DEF_DIR=${DEF_PATH}" >> $GITHUB_ENV
+        echo "DEF_DIR=${DEF_DIR}" >> $GITHUB_ENV
 
         # # Get tag of container from git tag (after #)
         # Get the git tag
