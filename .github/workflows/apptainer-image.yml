@@ -47,7 +47,7 @@ jobs:
         echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
         # Get the base image name and tag from the container
-        if grep -q 'From:.*hyakvnc-.*' "${DEF_PATH}"; then
+        if grep -q 'From:.*hyakvnc-.*' "${DEF_DIR}/Singularity"; then
           BASE_IMAGE_NAME="$(sed -E '/^\s*From:.*(hyakvnc-.*)/!d; s/.*(hyakvnc-[.A-Za-z0-9_-]+).*/\1/;1q' "${DEF_DIR}/Singularity")"
           echo "Base image name is ${BASE_IMAGE_NAME}"
           echo "BASE_IMAGE_NAME=\"${BASE_IMAGE_NAME}\"" >> $GITHUB_ENV 
