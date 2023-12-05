@@ -3,8 +3,7 @@
 .history/
 .idea/
 *.deb
+*.rpm
 *.tar.gz
 .setup-downloads/
 .build-arg-file
-sif/
-build_labels

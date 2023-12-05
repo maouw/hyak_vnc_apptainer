@@ -6,12 +6,35 @@ From: ubuntu:22.04
 	It is intended to be used as a base for other containers that need a VNC server.
 	It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
 
+%arguments
+	TURBOVNC_VERSION=3.1
+	TURBOVNC_DOWNLOAD_URL=https://sourceforge.net/projects/turbovnc/files/{{TURBOVNC_VERSION}}/turbovnc_{{TURBOVNC_VERSION}}_amd64.deb
+	TURBOVNC_DOWNLOAD_FILENAME=turbovnc_{{TURBOVNC_VERSION}}_amd64.deb
+	SETUP_DOWNLOADS_DIR=../../.setup-downloads
+
 %setup
 	[ -n "${APPTAINER_ROOTFS:-}" ] && ../../bin/write-apptainer-labels.sh > "${APPTAINER_ROOTFS}/.build_labels"
+	mkdir -p "{{SETUP_DOWNLOADS_DIR}}"
+	if ! [ -r "{{SETUP_DOWNLOADS_DIR}}/{{TURBOVNC_DOWNLOAD_FILENAME}}" ]; then
+		command -v curl >/dev/null 2>&1 || { echo "warning: curl not found!" >&2; exit 1; }
+		curl --fail --fail-early --compressed --location \
+			--continue-at - \
+			--output "{{SETUP_DOWNLOADS_DIR}}/{{TURBOVNC_DOWNLOAD_FILENAME}}" \
+			"{{TURBOVNC_DOWNLOAD_URL}}" || { echo "warning: curl failed!" >&2; rm -fv "{{SETUP_DOWNLOADS_DIR}}/TURBOVNC_DOWNLOAD_FILENAME}}" >&2; exit 1; }
+		echo "Downloaded \"{{TURBOVNC_DOWNLOAD_FILENAME}}\" from \"{{TURBOVNC_DOWNLOAD_URL}}\"."
+	fi
+	ln -v "{{SETUP_DOWNLOADS_DIR}}/{{TURBOVNC_DOWNLOAD_FILENAME}}" "${APPTAINER_ROOTFS}/turbovnc.deb" || { echo "warning: ln failed!" >&2; exit 1; }
+	
+
+%labels
+	edu.uw.hyakvnc.container.resources.recommends.mem 4G
+	edu.uw.hyakvnc.container.resources.requires.mem 4G
+	edu.uw.hyakvnc.container.resources.recommends.cpus 2
+	edu.uw.hyakvnc.container.resources.requires.cpus 1
 
 %files
 	../../common/configs/ubuntu /opt/setup/configs
-	../../common/scripts /opt/setup/scripts
+	./hyakvnc-vncserver.sh /opt/local/bin/hyakvnc-vncserver
 
 %environment
 {
@@ -24,12 +47,14 @@ From: ubuntu:22.04
 
 %post
 {
-	set -e # Exit on error
-	set -x # Print commands as they are executed
+	set -eux
 	export DEBIAN_FRONTEND=noninteractive
 
 	apt-get update -y -qq
-	apt-get install -y -qq apt-utils
+	apt-get install -y -qq \
+		apt-utils \
+		apt-transport-https \
+		localepurge
 
 	# Don't generate these locales"
 	mkdir -p /var/lib/locales/supported.d
@@ -50,15 +75,15 @@ From: ubuntu:22.04
 	apt-mark hold xfce4-pulseaudio-plugin pavucontrol pulseaudio pipewire pipewire-bin pipewire-pulse
 
 	# Install basic packages:
-	apt-get install -yq \
+	apt-get install -yq --no-install-recommends \
 		bash-completion \
 		bash-doc \
 		bc \
 		binutils \
 		bzip2 \
-		ca-certificates \
 		curl \
 		dash \
+		ed \
 		file \
 		git \
 		less \
@@ -66,10 +91,12 @@ From: ubuntu:22.04
 		nano \
 		netcat-openbsd \
 		openssh-client \
+		patch \
 		procps \
 		psmisc \
 		python3 \
 		rsync \
+		unzip \
 		vim-tiny \
 		zip
 
@@ -82,7 +109,10 @@ From: ubuntu:22.04
 		fonts-freefont-ttf \
 		fonts-ubuntu \
 		greybird-gtk-theme \
+		libfile-mimeinfo-perl \
+		libnet-dbus-perl \
 		libnotify-bin \
+		libx11-protocol-perl \
 		libxfce4ui-utils \
 		mousepad \
 		novnc \
@@ -112,24 +142,19 @@ From: ubuntu:22.04
 		xfdesktop4 \
 		xfonts-base \
 		xfwm4 \
-		xterm \
-		xvfb \
-		zip
-
+		xterm
+	
 	# Set xfce4-terminal as default terminal emulator:
 	update-alternatives --set x-terminal-emulator /usr/bin/xfce4-terminal.wrapper
 
 	# Install TurboVNC:
-	/opt/setup/scripts/install-turbovnc.sh
+	dpkg --install --force-depends /turbovnc.deb && apt-get install --fix-broken --yes --quiet
+	unlink /turbovnc.deb
 
 	# shellcheck disable=SC2016
 	echo '$vncUserDir = "$ENV{VNC_USER_DIR}";' >>/etc/turbovncserver.conf
 	# Copy configs:
 	rsync -avi --no-p --no-g --chmod=ugo=rwX /opt/setup/configs/ /
-
-	# Move hyakvnc-vncserver.sh to /opt/local/bin:
-	mkdir -p /opt/local/bin
-	mv /opt/setup/scripts/hyakvnc-vncserver.sh /opt/local/bin/hyakvnc-vncserver
 
 	# Erase the setup files:
 	rm -rf /opt/setup

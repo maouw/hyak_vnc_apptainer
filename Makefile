@@ -64,15 +64,22 @@ printvar-%: ## Print one Makefile variable.
 	@echo '  flavor = $(flavor $*)'
 	@echo '   value = $(value  $*)'
 
+
+.PHONY: clean-containers
+clean-all: clean ## Remove all built images
+	rm -rfv sif/
+
+.PHONY: clean-downloads
+clean-downloads: ## Remove all downloaded files.
+	rm -rfv .setup-downloads/*
+
 .PHONY: clean
-clean: ## Remove all built containers.
-	rmdir $(CONTAINERDIR)
-
-.PHONY: clean-all
-clean-all: clean ## Remove all built containers and all built images.
-	rm -rfv $(CONTAINERDIR)
-
-$(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif: common/scripts/hyakvnc-vncserver.sh common/scripts/install-turbovnc.sh bin/write-apptainer-labels.sh
+clean-all: clean-containers clean-downloads ## Remove all built containers, all built images, and all downloaded files.
 
 .DEFAULT_GOAL := help
+
+$(CONTAINERDIR)/*.sif:: bin/write-apptainer-labels.sh | $(CONTAINERDIR)
+
+$(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif:: common/scripts/hyakvnc-vncserver.sh common/scripts/install-turbovnc.sh $(shell find ./common/configs/ubuntu)
+$(CONTAINERDIR)/hyakvnc-%-ubuntu22.04-%.sif:: $(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif common/scripts/install-freesurfer.sh $(shell find ./common/configs/freesurfer)
 

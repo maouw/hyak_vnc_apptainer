@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-
-[[ "${XDEBUG:-}" = "1" ]] && set -o xtrace
+[[ "${XDEBUG:-0}" =~ ^[1yYtT] ]] && set -x
 set -o errtrace -o nounset -o pipefail
 shopt -qs lastpipe inherit_errexit
 
@@ -27,20 +26,23 @@ export VNC_SOCKET="${VNC_SOCKET:-${VNC_USER_DIR}/socket.uds}"
 export VNC_PORT="${VNC_PORT:-}"
 
 function _errecho() {
-	case "${1:-}" in
-		--verbose)
-			shift
-			[[ "${VERBOSE:-0}" == 0 ]] && return 0
-			;;
-		*) ;;
-	esac
+	[[ "${1:-}" == "--verbose" ]] && { shift; [[ "${VERBOSE:-0}" == 0 ]] && return 0; }
 	printf >&2 "[%b] %b\n" "${PROGNAME}" "$*" || true
 	return 0
 }
 
 function _errexit() {
-	printf >&2 "[%s:L%s]  Command \"%b\" failed with status %b.\n" "${PROGNAME}" "${BASH_LINENO[0]:-?}" "${BASH_COMMAND[0]:-}" "${?:-?}"
-	exit 1
+	local status="${?:-}"
+	_errecho "$@"
+	exit "${status:-1}"
+}
+
+function _errhandler_() {
+	local status="${?:-}"
+	local msg=""
+	[[ -n "${1:-}" ]] && msg=": $1"
+	printf >&2 "[%s:L%s]  Command \"%b\" failed with status %b%b\n" "${PROGNAME}" "${BASH_LINENO[0]:-?}" "${BASH_COMMAND[0]:-}" "${status:-"?"}" "${msg:-}" || true
+	exit "${status:-1}"
 }
 
 function _cleanup_vncserver() {
@@ -145,7 +147,7 @@ function main() {
 	done
 
 	# Trap errors:
-	trap _errexit ERR
+	trap _errhandler_ ERR
 
 	_errecho --verbose "Running as \"${USER:-$(id -un || true)}\" with UID \"${UID:-$(id -u || true)}\" and GID \"${GID:-$(id -g || true)}\""
 
@@ -160,7 +162,7 @@ function main() {
 	_errecho --verbose "Set VNC password to \"${VNC_PASSWORD:-}\""
 
 	local hostname
-	[[ -n "${hostname:-}" ]] || hostname="$(uname -n)" || hostname="${HOST:-}" || _errecho "Could not determine hostname."
+	[[ -n "${hostname:-}" ]] || hostname="$(uname -n)" || hostname="${HOST:-}" || _errexit "Could not determine hostname."
 	[[ -n "${hostname:-}" ]] && echo "${hostname}" >"${VNC_USER_DIR}/hostname"
 	_errecho --verbose "Set hostname to \"${hostname}\""
 	printenv >"${VNC_USER_DIR}/environment"
@@ -168,7 +170,9 @@ function main() {
 	# Set port or socket:
 	if [[ -n "${VNC_PORT:-}" ]]; then
 		# Validate port:
-		[[ "${VNC_PORT}" =~ ^[0-9]+$ ]] || [[ "${VNC_PORT}" -lt 1 ]] || [[ "${VNC_PORT}" -gt 65535 ]] && { _errecho --verbose "VNC port \"${VNC_PORT}\" is invalid."; return 1; }
+		if ! { [[ "${VNC_PORT}" =~ ^[0-9]+$ ]] && [[ "${VNC_PORT}" -lt 1 ]] && [[ "${VNC_PORT}" -gt 65535 ]]; }; then
+			_errexit --verbose "VNC port \"${VNC_PORT}\" is invalid."
+		fi
 		set -- -rfbport "${VNC_PORT}" "${@}"
 		echo "${VNC_PORT}" >"${VNC_USER_DIR}/port"
 	elif [[ -n "${VNC_SOCKET:-}" ]]; then

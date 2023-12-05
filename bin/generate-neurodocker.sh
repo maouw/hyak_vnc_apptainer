@@ -9,23 +9,23 @@ PROGNAME="${0##*/}"
 VERBOSE="${VERBOSE:-0}"
 PROG_VERSION="0.0.1"
 SCRIPTDIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" || true
+NEURODOCKER_IMAGE_TAG="master"
+NEURODOCKER_IMAGE="repronim/neurodocker:${NEURODOCKER_IMAGE_TAG}"
+NEURODOCKER_RUNNER="${NEURODOCKER_RUNNER:-apptainer}"
+NEURODOCKER_TEMPLATE_PATH="${NEURODOCKER_TEMPLATE_PATH:-}"
+NEURODOCKER_GENERATE_FORMAT="${NEURODOCKER_GENERATE_FORMAT:-apptainer}"
+
 
 function _errecho() {
-	case "${1:-}" in
-		--verbose)
-			shift
-			[[ "${VERBOSE:-0}" == 0 ]] && return 0
-			;;
-		*) ;;
-	esac
+	[[ "${1:-}" == "--verbose" ]] && { shift; [[ "${VERBOSE:-0}" == 0 ]] && return 0; }
 	printf >&2 "[%b] %b\n" "${PROGNAME}" "$*" || true
 	return 0
 }
 
 function _errexit() {
-	local status
-	status="${?:-1}"
-	echo >&2 "[${0##*/}:L${BASH_LINENO[0]:-?}]  Command \"${BASH_COMMAND[*]:-}\" failed with status ${status:-?}. Exiting." || true
+	local status="${1:-}"
+	printf >&2 "[%s:L%s]  Command \"%b\" failed with status %b.\n" "${PROGNAME}" "${BASH_LINENO[0]:-?}" "${BASH_COMMAND[0]:-}" "${status:-"?"}" || true
+	exit "${status:-1}"
 }
 
 function show_help() {
@@ -70,13 +70,10 @@ EOF
 }
 
 function main() {
-	local generate_format="apptainer"
 	local bootstrap_type base_image_url base_image_schema base_image
 	local -i no_nd_base_fix=0
 	local output_file
-	local neurodocker_runner
-	local neurodocker_runner_image="repronim/neurodocker:latest"
-	local template_path
+
 	local -i write_build_labels=0
 	# Parse arguments:
 	(($# == 0)) && { show_help; return 0; }
@@ -101,10 +98,10 @@ function main() {
 				shift || { log ERROR "$1 requires an argument"; return 1; }
 				case "${1:-}" in
 					apptainer | singularity)
-						generate_format="apptainer"
+						NEURODOCKER_GENERATE_FORMAT="apptainer"
 						;;
 					docker)
-						generate_format="dockerfile"
+						NEURODOCKER_GENERATE_FORMAT="dockerfile"
 						;;
 					*)
 						_errecho "Invalid generate format \"${1:-}\". Must be one of \"dockerfile\", \"apptainer\", or \"singularity\"."
@@ -114,8 +111,8 @@ function main() {
 				;;
 			--template-path)
 				shift || { log ERROR "$1 requires an argument"; return 1; }
-				template_path="${1:-}"
-				[[ -d "${template_path}" ]] || { _errecho "No directory at \"${template_path}\". Exiting."; return 1; }
+				NEURODOCKER_TEMPLATE_PATH="${1:-}"
+				[[ -n "${NEURODOCKER_TEMPLATE_PATH:-}" ]] || [[ -d "${NEURODOCKER_TEMPLATE_PATH:-}" ]] || { _errecho "No directory at \"${NEURODOCKER_TEMPLATE_PATH:-}\". Exiting."; return 1; }
 				;;
 			--base-image) # Set the base image
 				shift || { log ERROR "$1 requires an argument"; return 1; }
@@ -138,13 +135,13 @@ function main() {
 				;;
 			--neurodocker-runner-image) # Set the neurodocker runner image to use
 				shift || { log ERROR "$1 requires an argument"; return 1; }
-				neurodocker_runner_image="${1:-}"
+				NEURODOCKER_IMAGE="${1:-}"
 				;;
 			--neurodocker-runner) # Set the neurodocker runner to use
 				shift || { log ERROR "$1 requires an argument"; return 1; }
 				case "${1:-}" in
 					apptainer | singularity | docker | neurodocker)
-						neurodocker_runner="${1:-}"
+						NEURODOCKER_RUNNER="${1:-}"
 						;;
 					*)
 						_errecho "Invalid neurodocker runner \"${1:-}\". Must be one of \"apptainer\", \"singularity\", or \"docker\"."
@@ -207,19 +204,19 @@ function main() {
 	esac
 
 	# Set the neurodocker runner:
-	if ! command -v "${neurodocker_runner:=apptainer}" >/dev/null 2>&1; then
+	if ! command -v "${NEURODOCKER_RUNNER:=apptainer}" >/dev/null 2>&1; then
 		_errecho "Could not find \"${1:-}\" in \$PATH. Will try to use first available of \"apptainer, singularity, docker, or neurodocker\"."
 		for runner in apptainer singularity docker neurodocker; do
 			if command -v "${runner}" >/dev/null 2>&1; then
-				neurodocker_runner="${runner}"
-				_errecho "Using \"${neurodocker_runner}\" as the neurodocker runner."
+				NEURODOCKER_RUNNER="${runner}"
+				_errecho "Using \"${NEURODOCKER_RUNNER}\" as the neurodocker runner."
 				break
 			fi
 		done
 	fi
 
-	if ! command -v "${neurodocker_runner}" >/dev/null 2>&1; then
-		_errecho "Could not find \"${neurodocker_runner}\" in \$PATH. Exiting."
+	if ! command -v "${NEURODOCKER_RUNNER}" >/dev/null 2>&1; then
+		_errecho "Could not find \"${NEURODOCKER_RUNNER}\" in \$PATH. Exiting."
 		return 1
 	fi
 
@@ -227,33 +224,33 @@ function main() {
 	local -a neurodocker_args=()
 	local -a neurodocker_runner_args=()
 
-	case "${neurodocker_runner}" in
+	case "${NEURODOCKER_RUNNER}" in
 		apptainer | singularity)
 			neurodocker_args+=(run)
-			case "${neurodocker_runner_image}" in
+			case "${NEURODOCKER_IMAGE:-}" in
 				*://*) ;;
 
-				*) neurodocker_runner_image="docker://${neurodocker_runner_image}" ;;
+				*) NEURODOCKER_IMAGE="docker://${NEURODOCKER_IMAGE:-}" ;;
 			esac
-			neurodocker_args+=("${neurodocker_runner_image}")
+			neurodocker_args+=("${NEURODOCKER_IMAGE:-}")
 			;;
 		docker)
 			neurodocker_args+=(run --rm)
-			[[ -n "${template_path:-}" ]] && neurodocker_args+=(--volume "${template_path}:/templates")
-			neurodocker_args+=("${neurodocker_runner_image}")
-			[[ -n "${template_path:-}" ]] && neurodocker_args+=(--volume "${template_path}:/templates")
+			[[ -n "${NEURODOCKER_TEMPLATE_PATH:-}" ]] && neurodocker_args+=(--volume "${NEURODOCKER_TEMPLATE_PATH}:/templates")
+			neurodocker_args+=("${NEURODOCKER_IMAGE:-}")
+			[[ -n "${NEURODOCKER_TEMPLATE_PATH:-}" ]] && neurodocker_args+=(--volume "${NEURODOCKER_TEMPLATE_PATH}:/templates")
 			;;
 		*) ;;
 	esac
 
-	[[ "${generate_format}" == "apptainer" ]] && generate_format="singularity"
+	[[ "${NEURODOCKER_GENERATE_FORMAT}" == "apptainer" ]] && NEURODOCKER_GENERATE_FORMAT="singularity"
 	neurodocker_args+=(generate)
-	[[ -n "${template_path:-}" ]] && neurodocker_args+=(--template-path "${template_path}")
-	neurodocker_args+=("${generate_format}")
+	[[ -n "${NEURODOCKER_TEMPLATE_PATH:-}" ]] && neurodocker_args+=(--template-path "${NEURODOCKER_TEMPLATE_PATH}")
+	neurodocker_args+=("${NEURODOCKER_GENERATE_FORMAT}")
 	neurodocker_args+=(--base-image "${base_image}")
 
 	# Add build labels if requested:
-	if [[ "${generate_format}" == "singularity" ]] && [[ "${write_build_labels:-0}" == 1 ]] && [[ -w "$(dirname "${output_file:-}")" ]]; then
+	if [[ "${NEURODOCKER_GENERATE_FORMAT}" == "singularity" ]] && [[ "${write_build_labels:-0}" == 1 ]] && [[ -w "$(dirname "${output_file:-}")" ]]; then
 		[[ -x "${SCRIPTDIR}/write-apptainer-labels.sh" ]] || { _errecho "Could not find \"write-apptainer-labels.sh\" in \"${SCRIPTDIR}\". Exiting."; return 1; }
 		"${SCRIPTDIR}/write-apptainer-labels.sh" >"$(dirname "${output_file}")"/build_labels || { _errecho "Could not write build labels. Exiting."; return 1; }
 		neurodocker_args+=(--copy build_labels "/.build_labels")
@@ -265,12 +262,12 @@ function main() {
 
 	# Run neurodocker:
 	local res
-	_errecho "Running neurodocker with the following arguments:\n${neurodocker_runner} ${neurodocker_runner_args[*]} ${neurodocker_args[*]}"
-	res="$("${neurodocker_runner}" "${neurodocker_runner_args[@]}" "${neurodocker_args[@]}")" || { _errecho "neurodocker failed (exit code ${?})"; return 1; }
+	_errecho "Running neurodocker with the following arguments:\n${NEURODOCKER_RUNNER} ${neurodocker_runner_args[*]} ${neurodocker_args[*]}"
+	res="$("${NEURODOCKER_RUNNER}" "${neurodocker_runner_args[@]}" "${neurodocker_args[@]}")" || { _errecho "neurodocker failed (exit code ${?})"; return 1; }
 	[[ -z "${res:-}" ]] && { _errecho "neurodocker did not return any output. Exiting."; return 1; }
 
 	# Fix the "base_image" key in the generated output:
-	if [[ "${generate_format}" == "singularity" ]] && [[ "${no_nd_base_fix:-0}" == 0 ]]; then
+	if [[ "${NEURODOCKER_GENERATE_FORMAT}" == "singularity" ]] && [[ "${no_nd_base_fix:-0}" == 0 ]]; then
 		_errecho "Fixing the \"bootstrap:\" and  \"base_image\" keys in the generated output."
 		res="$(echo "${res}" | sed -E 's/^\s*bootstrap:\s*docker.*$/bootstrap: '"${bootstrap_type}"'/Ig' || { _errecho "Could not fix the \"bootstrap\" key in the generated output."; })"
 		res="$(echo "${res}" | sed -E 's#["]base_image["]\s*[:]\s*["][^"]*["]#"base_image": "'"${base_image_url}"'"#Ig')" || { _errecho "Could not fix the \"base_image\" key in the generated output."; }
