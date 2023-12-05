@@ -30,7 +30,7 @@ jobs:
         [ -n "${IMAGE_NAME:-}" ] || { echo "No container name found."; exit 1; }
         echo "IMAGE_NAME="${IMAGE_NAME}"" >> $GITHUB_ENV
 
-        DEF_DIR="defs/${IMAGE_NAME}"
+        DEF_DIR="def/${IMAGE_NAME}"
         [ -d "${DEF_DIR:-}" ] || { echo "No directory found for DEF_DIR at ${DEF_DIR:-}"; exit 1; }
         [ -f "${DEF_DIR}/Singularity" ] || { echo "No definition file found at ${DEF_DIR:-}"; exit 1; }
         echo "DEF_DIR=${DEF_PATH}" >> $GITHUB_ENV
