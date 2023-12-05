@@ -14,15 +14,15 @@ jobs:
     steps:
     - name: Check out code for the container build
       uses: actions/checkout@v4
+    - name: Cache CURL downloads
+      uses: actions/cache@v3
+      with:
+        path: .setup-downloads
+        key: ${{ runner.os }}
     - name: Get container name
       run: |
-        set -x
+        set -eux
         [ -n "${BASH_VERSION:-}" ] && set -o pipefail
-        # Show the current directory
-        pwd
-        # Show the contents of the current directory
-        ls -l
-
         # Get container name from tag
         IMAGE_NAME="$(echo "${GITHUB_REF_NAME:-}" | sed -E 's/^sif-//; s/@.*$//')"
         echo "Container name is ${IMAGE_NAME:-}"
@@ -40,7 +40,6 @@ jobs:
         echo "IMAGE_TAG is ${IMAGE_TAG}."
         echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
-        IMAGE_VCS_URL=
         # Get the base image name and tag from the container
         if grep -q 'From:.*hyakvnc-.*' "${IMAGE_NAME:-}"/Singularity; then
           BASE_IMAGE_NAME="$(sed -E '/^\s*From:.*(hyakvnc-.*)/!d; s/.*(hyakvnc-[.A-Za-z0-9_-]+).*/\1/;1q' "${IMAGE_NAME}/Singularity")"
@@ -52,21 +51,16 @@ jobs:
         fi
         
         # Get build-arg-file contents
-        git tag -l --format='%(contents)' "${ref_name}" | sed -E '/^.+=.*$/!d'>> .build-arg-file
+        git tag -l --format='%(contents)' "${ref_name}" | sed -E '/^.+=.*$/!d'>> ./defs/${IMAGE_NAME}/.build-arg-file
         
         # Add bootstrap args for derived containers
         echo "BOOTSTRAP_SOURCE=oras" >> .build-arg-file
-        echo "BOOTSTRAP_FROM_REPO=ghcr.io/${{ github.repository }}" >> .build-arg-file
-        echo "BOOTSTRAP_FROM_SUFFIX=:${BASE_IMAGE_TAG:-latest}" >> .build-arg-file
+        echo "BOOTSTRAP_FROM_REPO=ghcr.io/${{ github.repository }}" >> ./defs/${IMAGE_NAME}/.build-arg-file
+        echo "BOOTSTRAP_FROM_SUFFIX=:${BASE_IMAGE_TAG:-latest}" >> ./defs/${IMAGE_NAME}/.build-arg-file
 
         echo ".build-arg-file contents:"
-        cat .build-arg-file 2>/dev/null || echo "No build-arg-file found."
+        cat ./defs/${IMAGE_NAME}/.build-arg-file 2>/dev/null || echo "No build-arg-file found."
 
-        # Get download URLs from build-arg-file for curl cache
-        sed '/.*DOWNLOAD_URL=.*/!d' .build-arg-file > .setup-download-urls
-        echo "Download URLs:"
-        cat .setup-download-urls 2>/dev/null || echo "No download URLs found."
-      
     - name: Delete GitHub AGENT_TOOLSDIRECTORY to free space
       run: |
         echo "Disk space before:" && df -h
@@ -75,39 +69,30 @@ jobs:
       run: |
         echo "Disk space before:" && df -h
         sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android && echo "Done removing .NET, Android, and Haskell tools."
-      
     - name: Install Apptainer
-      uses: maouw/github-action-apptainer-install@v1
-      
-    # Cache curl downloads
-    - uses: actions/cache@v3
-      id: cache-setup-downloads
-      with:
-        path: |
-          .setup-downloads/*
-        key: ${{ runner.os }}-${{hashFiles('.setup-download-urls')}}
-      
+      uses: maouw/github-action-apptainer-install@v1        
     - name: Build Container
       run: |
-        pwd
-        ls -l
+        set -eux
+        [ -n "${BASH_VERSION:-}" ] && set -o pipefail
+        export APPCONTAINER_CACHE_DIR=".setup-downloads/apptainer-cache"
         pushd "${IMAGE_NAME}"
         echo "Building ${IMAGE_NAME}.sif"
-        apptainer build --warn-unused-build-args --force --build-arg-file ../.build-arg-file ../"${IMAGE_NAME}.sif" Singularity || { echo "Failed to build ${IMAGE_NAME}.sif"; exit 1; }
+        touch .build-arg-file
+        apptainer build --warn-unused-build-args --fix-perms --force --build-arg-file .build-arg-file ../../sifs/"${IMAGE_NAME}.sif" Singularity || { echo "Failed to build ${IMAGE_NAME}.sif"; exit 1; }
         echo "Built ${IMAGE_NAME}.sif"
         popd
-        apptainer cache clean -f
-        echo "Cleaned Apptainer cache"
-        echo "Disk space after:" && df -h
     - name: Login and Deploy Container
       run: |
-        [ -r "${IMAGE_NAME:-}.sif" ] || { echo "No container named ${IMAGE_NAME:-}.sif found."; exit 1; }
+        set -eux
+        [ -n "${BASH_VERSION:-}" ] && set -o pipefail
+        [ -r "sifs/${IMAGE_NAME:-}.sif" ] || { echo "No container named sifs/${IMAGE_NAME:-}.sif found."; exit 1; }
         echo "Container size:"
-        du -h "${IMAGE_NAME:-}.sif"
+        du -h "sifs/${IMAGE_NAME}.sif"
         echo "Disk usage:"
         df -h
-        echo "Pushing ${IMAGE_NAME}.sif to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
+        echo "Pushing sifs/${IMAGE_NAME}.sif to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
         apptainer remote login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} oras://ghcr.io
-        apptainer push -U "${IMAGE_NAME}.sif" oras://ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} || { echo "Failed to push ${IMAGE_NAME}.sif to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"; exit 1; }
-        echo "Pushed ${IMAGE_NAME}.sif to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
+        apptainer push -U "sifs/${IMAGE_NAME}.sif" oras://ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} || { echo "Failed to push sifs/${IMAGE_NAME}.sif to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"; exit 1; }
+        echo "Pushed sifs/${IMAGE_NAME}.sif to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
         
