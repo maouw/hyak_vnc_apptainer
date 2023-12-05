@@ -23,12 +23,18 @@ jobs:
       run: |
         set -eux
         [ -n "${BASH_VERSION:-}" ] && set -o pipefail
+
         # Get container name from tag
         IMAGE_NAME="$(echo "${GITHUB_REF_NAME:-}" | sed -E 's/^sif-//; s/@.*$//')"
         echo "Container name is ${IMAGE_NAME:-}"
-        [ -f "${IMAGE_NAME:-}/Singularity" ] || { echo "No container named ${IMAGE_NAME:-} found."; exit 1; }
+        [ -n "${IMAGE_NAME:-}" ] || { echo "No container name found."; exit 1; }
         echo "IMAGE_NAME="${IMAGE_NAME}"" >> $GITHUB_ENV
-        
+
+        DEF_DIR="defs/${IMAGE_NAME}"
+        [ -d "${DEF_DIR:-}" ] || { echo "No directory found for DEF_DIR at ${DEF_DIR:-}"; exit 1; }
+        [ -f "${DEF_DIR}/Singularity" ] || { echo "No definition file found at ${DEF_DIR:-}"; exit 1; }
+        echo "DEF_DIR=${DEF_PATH}" >> $GITHUB_ENV
+
         # # Get tag of container from git tag (after #)
         # Get the git tag
         ref_name="${{ github.ref_name }}"
@@ -41,8 +47,8 @@ jobs:
         echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
         # Get the base image name and tag from the container
-        if grep -q 'From:.*hyakvnc-.*' "${IMAGE_NAME:-}"/Singularity; then
-          BASE_IMAGE_NAME="$(sed -E '/^\s*From:.*(hyakvnc-.*)/!d; s/.*(hyakvnc-[.A-Za-z0-9_-]+).*/\1/;1q' "${IMAGE_NAME}/Singularity")"
+        if grep -q 'From:.*hyakvnc-.*' "${DEF_PATH}"; then
+          BASE_IMAGE_NAME="$(sed -E '/^\s*From:.*(hyakvnc-.*)/!d; s/.*(hyakvnc-[.A-Za-z0-9_-]+).*/\1/;1q' "${DEF_DIR}/Singularity")"
           echo "Base image name is ${BASE_IMAGE_NAME}"
           echo "BASE_IMAGE_NAME=\"${BASE_IMAGE_NAME}\"" >> $GITHUB_ENV 
           BASE_IMAGE_TAG="$(git tag --sort=-"creatordate:iso" --list '*'"${BASE_IMAGE_NAME:-}"'*' |  sed -E '/.*@.*/!d; s/(.*)@(.+$)/\2/;1q')"
@@ -51,15 +57,15 @@ jobs:
         fi
         
         # Get build-arg-file contents
-        git tag -l --format='%(contents)' "${ref_name}" | sed -E '/^.+=.*$/!d'>> ./defs/${IMAGE_NAME}/.build-arg-file
+        git tag -l --format='%(contents)' "${ref_name}" | sed -E '/^.+=.*$/!d'>> "${DEF_DIR}/.build-arg-file"
         
         # Add bootstrap args for derived containers
         echo "BOOTSTRAP_SOURCE=oras" >> .build-arg-file
-        echo "BOOTSTRAP_FROM_REPO=ghcr.io/${{ github.repository }}" >> ./defs/${IMAGE_NAME}/.build-arg-file
-        echo "BOOTSTRAP_FROM_SUFFIX=:${BASE_IMAGE_TAG:-latest}" >> ./defs/${IMAGE_NAME}/.build-arg-file
+        echo "BOOTSTRAP_FROM_REPO=ghcr.io/${{ github.repository }}" >> "${DEF_DIR}/.build-arg-file"
+        echo "BOOTSTRAP_FROM_SUFFIX=:${BASE_IMAGE_TAG:-latest}" >> "${DEF_DIR}/.build-arg-file"
 
         echo ".build-arg-file contents:"
-        cat ./defs/${IMAGE_NAME}/.build-arg-file 2>/dev/null || echo "No build-arg-file found."
+        cat "${DEF_DIR}/.build-arg-file" 2>/dev/null || echo "No build-arg-file found."
 
     - name: Delete GitHub AGENT_TOOLSDIRECTORY to free space
       run: |
@@ -75,18 +81,18 @@ jobs:
       run: |
         set -eux
         [ -n "${BASH_VERSION:-}" ] && set -o pipefail
-        export APPCONTAINER_CACHE_DIR=".setup-downloads/apptainer-cache"
-        pushd "${IMAGE_NAME}"
-        echo "Building ${IMAGE_NAME}.sif"
+        export APPTAINER_CACHE_DIR=".setup-downloads/apptainer-cache"
+        pushd  "${DEF_DIR}"
+        echo "Building \"${IMAGE_NAME}.sif\""
         touch .build-arg-file
-        apptainer build --warn-unused-build-args --fix-perms --force --build-arg-file .build-arg-file ../../sifs/"${IMAGE_NAME}.sif" Singularity || { echo "Failed to build ${IMAGE_NAME}.sif"; exit 1; }
-        echo "Built ${IMAGE_NAME}.sif"
+        apptainer build --warn-unused-build-args --fix-perms --force --build-arg-file .build-arg-file ../../sifs/"${IMAGE_NAME}.sif" Singularity || { echo "Failed to build \"${IMAGE_NAME}.sif\""; exit 1; }
+        echo "Built \"${IMAGE_NAME}.sif\""
         popd
     - name: Login and Deploy Container
       run: |
         set -eux
         [ -n "${BASH_VERSION:-}" ] && set -o pipefail
-        [ -r "sifs/${IMAGE_NAME:-}.sif" ] || { echo "No container named sifs/${IMAGE_NAME:-}.sif found."; exit 1; }
+        [ -r "sifs/${IMAGE_NAME}.sif" ] || { echo "No container named sifs/${IMAGE_NAME:-}.sif found."; exit 1; }
         echo "Container size:"
         du -h "sifs/${IMAGE_NAME}.sif"
         echo "Disk usage:"
