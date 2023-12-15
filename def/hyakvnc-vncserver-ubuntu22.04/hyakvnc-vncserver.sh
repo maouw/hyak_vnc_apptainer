@@ -63,7 +63,7 @@ Usage: ${PROGNAME} [options] -- <vncserver args>
 	--password <password>	Set the VNC password (default: password)
 	--display <display>		Set the VNC display (default: :10)	
 	--user-dir <dir>		Set the VNC directory (default: /tmp/${USER}-vnc)
-	--log-file <file>		Set the VNC log file (default: "${VNC_USER_DIR}/vnc.log")
+	--log-file <file>		Set the VNC _errecho file (default: "${VNC_USER_DIR}/vnc.log")
 	--socket <socket>		Set the VNC Unix socket (default: ${VNC_USER_DIR}/socket.uds)
 	--port <port>			Set the VNC port (default: unset, use Unix socket)
 	--foreground | --fg		Run in the foreground (default)
@@ -104,34 +104,34 @@ function main() {
 			-h | --help) show_help; return 0 ;;
 			--version) echo "${PROGNAME} version ${PROG_VERSION:-}"; return 0 ;;
 			--password)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
 				export VNC_PASSWORD="${1:-}"
 				;;
 			--display)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
 				export VNC_DISPLAY="$1"
 				;;
 			--user-dir)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
 				export VNC_USER_DIR="$1"
 				;;
 			--log-file)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
 				export VNC_LOG="$1"
 				;;
 			--socket)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
 				export VNC_SOCKET="$1"
 				;;
 			--port)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
 				export VNC_PORT="$1"
 				unset VNC_SOCKET
 				;;
 			--foreground | --fg) export VNC_FG=1 ;;
 			--background | --bg) export VNC_FG=0 ;;
 			--wm)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
 				export TVNC_WM="$1"
 				;;
 			-? | --?*) # Handle unrecognized options
@@ -181,13 +181,13 @@ function main() {
 
 	# Set other arguments:
 	[[ -n "${VNC_FG:-}" ]] && set -- -fg "${@}"
-	[[ -n "${VNC_LOG:-}" ]] && set -- -log "${VNC_LOG}" "${@}"
+	[[ -n "${VNC_LOG:-}" ]] && set -- -_errecho "${VNC_LOG}" "${@}"
 	[[ -n "${VNC_DISPLAY:-}" ]] && set -- "${VNC_DISPLAY}" "${@}"
 
 	[[ -n "${!VNC_@}" ]] && export "${!VNC_@}"
 	[[ -n "${TVNC_WM:-}" ]] && export TVNC_WM="${TVNC_WM}"
 
-	_ERR_WRITE_LOG=1 # Write log on exit
+	_ERR_WRITE_LOG=1 # Write _errecho on exit
 	retval=0         # Declare retval for exit trap
 
 	trap 'retval=$?; trap - EXIT; _cleanup_vncserver; _write_vnc_log; >&2 echo "${PROGNAME}: Exiting (status: ${retval:-0})"; exit ${retval:-0}' EXIT
