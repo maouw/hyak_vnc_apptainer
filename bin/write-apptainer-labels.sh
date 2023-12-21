@@ -51,8 +51,9 @@ write_apptainer_labels() {
 	if [ -z "${IMAGE_AUTHOR:-}" ] && command -v git >/dev/null 2>&1; then
 		[ -n "${IMAGE_AUTHOR_EMAIL:-}" ] || IMAGE_AUTHOR_EMAIL="$(git config --get user.email || git config --get github.email || true)"
 		[ -n "${IMAGE_AUTHOR_NAME:-}" ] || IMAGE_AUTHOR_NAME="$(git config --get user.name || git config --get github.user || true)"
-		IMAGE_AUTHOR="${IMAGE_AUTHOR_NAME:+${IMAGE_AUTHOR_NAME} }<${IMAGE_AUTHOR_EMAIL:-}>"
+		[ -n "${IMAGE_AUTHOR_NAME:-}${IMAGE_AUTHOR_EMAIL:-}" ] && IMAGE_AUTHOR="${IMAGE_AUTHOR_NAME:+${IMAGE_AUTHOR_NAME} }<${IMAGE_AUTHOR_EMAIL:-}>"
 	fi
+	[ -z "${IMAGE_AUTHOR:-}" ] && IMAGE_AUTHOR="${GITHUB_REPOSITORY_OWNER:-}" # Set the default author to the GitHub repository owner if set
 
 	# Write the build labels to the build labels path for both the org.label-schema and org.opencontainers.image formats:
 	write_to_build_labels "org.label-schema.title" "org.opencontainers.image.title" "${IMAGE_TITLE:-}"
@@ -60,7 +61,8 @@ write_apptainer_labels() {
 	write_to_build_labels "org.label-schema.vcs-ref" "org.opencontainers.image.revision" "${IMAGE_VCS_REF:-}"
 	write_to_build_labels "org.label-schema.vcs-url" "org.opencontainers.image.source" "${IMAGE_VCS_URL:-}"
 	write_to_build_labels "org.label-schema.vendor" "org.opencontainers.image.vendor" "${IMAGE_VENDOR:-}"
-	write_to_build_labels "MAINTAINER" "org.opencontainers.image.authors" "${IMAGE_AUTHOR:-}"
+	write_to_build_labels "MAINTAINER" "maintainer" "org.opencontainers.image.authors" "${IMAGE_AUTHOR:-}"
+	write_to_build_labels "org.label-schema.version" "org.opencontainers.image.version" "${IMAGE_VERSION:-}"
 	write_to_build_labels "org.label-schema.description" "org.opencontainers.image.description" "${IMAGE_DESCRIPTION:-}"
 	write_to_build_labels "org.label-schema.usage" "org.opencontainers.image.documentation" "${IMAGE_DOCUMENTATION:-}"
 }

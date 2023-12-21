@@ -4,7 +4,6 @@ set -o pipefail
 
 [[ -n "${XDEBUG:-}" ]] && set -x
 
-TAG_PREFIX="sif-"
 IMAGE_TAG_SEP="@"
 
 IMAGE_NAME="${1:-}"
@@ -21,7 +20,7 @@ fi
 
 FULL_CONTAINER_NAME="${IMAGE_NAME}:${IMAGE_TAG}"
 
-GIT_TAG="${TAG_PREFIX}${IMAGE_NAME}${IMAGE_TAG_SEP}${IMAGE_TAG}"
+GIT_TAG="${IMAGE_NAME}${IMAGE_TAG_SEP}${IMAGE_TAG}"
 
 [[ -n "${GIT_TAG:-}" ]] || { echo "GIT_TAG is empty" >&2; exit 1; }
 

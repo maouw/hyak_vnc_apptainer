@@ -1,13 +1,22 @@
-name: Singularity Build
+name: Build and Deploy Apptainer Container
 on:
   push:
     tags:
-    - sif-*
+    - "*@*"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  APPTAINER_VERSION: 1.2.5
+  SETUP_DOWNLOADS_DIR: .setup-downloads
+  APPTAINER_CACHE_DIR: "${SETUP_DOWNLOADS_DIR}/apptainer-cache"
 
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
-    name: Build Apptainer image
+    name: Build and Deploy Apptainer Container
     permissions:
       contents: read
       packages: write
@@ -17,34 +26,24 @@ jobs:
     - name: Cache CURL downloads
       uses: actions/cache@v3
       with:
-        path: .setup-downloads
+        path: ${{ env.SETUP_DOWNLOADS_DIR }}
         key: ${{ runner.os }}
     - name: Get container name
       run: |
-        set -eux
-        [ -n "${BASH_VERSION:-}" ] && set -o pipefail
-
+        set -euxo pipefail
         # Get container name from tag
-        IMAGE_NAME="$(echo "${GITHUB_REF_NAME:-}" | sed -E 's/^sif-//; s/@.*$//')"
-        echo "Container name is ${IMAGE_NAME:-}"
-        [ -n "${IMAGE_NAME:-}" ] || { echo "No container name found."; exit 1; }
+        [[ -n "${IMAGE_NAME:=${GITHUB_REF_NAME%%@*}}" ]] || { echo "No container name found." ; exit 1; }
+        echo "Container name is \"${IMAGE_NAME:-}\"" 
         echo "IMAGE_NAME="${IMAGE_NAME}"" >> $GITHUB_ENV
 
-        DEF_DIR="def/${IMAGE_NAME}"
-        [ -d "${DEF_DIR:-}" ] || { echo "No directory found for DEF_DIR at ${DEF_DIR:-}"; exit 1; }
-        [ -f "${DEF_DIR}/Singularity" ] || { echo "No definition file found at ${DEF_DIR:-}"; exit 1; }
+        [[ -d "${DEF_DIR:=def/${IMAGE_NAME}}" ]] || { echo "No directory found for DEF_DIR at \"${DEF_DIR:-}\"" ; exit 1; }
+        [[ -f "${DEF_DIR}/Singularity" ]] || { echo "No definition file found at \"${DEF_DIR}/Singularity\"" ; exit 1; }
         echo "DEF_DIR=${DEF_DIR}" >> $GITHUB_ENV
 
-        # # Get tag of container from git tag (after #)
-        # Get the git tag
-        ref_name="${{ github.ref_name }}"
-        echo "ref_name is ${ref_name}."
-
-        # Get the image tag: the part after the @ in the git tag
-        IMAGE_TAG="$(echo "${ref_name:-}" | sed -E '/.*@.*/!d; s/(.*)@(.+$)/\2/;1q')"
-        IMAGE_TAG="${IMAGE_TAG:-}"
-        echo "IMAGE_TAG is ${IMAGE_TAG}."
-        echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+        IMAGE_TAG="${IMAGE_TAG:-${GITHUB_REF_NAME##*@}}"
+        IMAGE_TAG="${IMAGE_TAG:-latest}"
+        echo "Container tag is \"${IMAGE_TAG:-}\""
+        echo "IMAGE_TAG="${IMAGE_TAG}"" >> $GITHUB_ENV
 
         # Get the base image name and tag from the container
         if grep -q 'From:.*hyakvnc-.*' "${DEF_DIR}/Singularity"; then
@@ -57,7 +56,7 @@ jobs:
         fi
         
         # Get build-arg-file contents
-        git tag -l --format='%(contents)' "${ref_name}" | sed -E '/^.+=.*$/!d'>> "${DEF_DIR}/.build-arg-file"
+        git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" | sed -E '/^.+=.*$/!d'>> "${DEF_DIR}/.build-arg-file"
         
         # Add bootstrap args for derived containers
         echo "BOOTSTRAP_SOURCE=oras" >> "${DEF_DIR}/.build-arg-file"
@@ -69,18 +68,23 @@ jobs:
 
     - name: Delete GitHub AGENT_TOOLSDIRECTORY to free space
       run: |
+        set -euxo pipefail
         echo "Disk space before:" && df -h
         sudo rm -rf /opt/hostedtoolcache; echo "Done removing /opt/hostedtoolcache"
     - name: Delete .NET, Android, Haskell tools to free space
       run: |
+        set -euxo pipefail
         echo "Disk space before:" && df -h
         sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android && echo "Done removing .NET, Android, and Haskell tools."
-    - name: Install Apptainer
-      uses: maouw/github-action-apptainer-install@v1        
+    - name: Download and Install Apptainer
+      run: |
+        set -euxo pipefail
+        [[ -r "${SETUP_DOWNLOADS_DIR}/apptainer-${APPTAINER_VERSION}.deb" ]] || curl -L https://github.com/apptainer/apptainer/releases/download/v${APPTAINER_VERSION}/apptainer_${APPTAINER_VERSION}_amd64.deb -o "${SETUP_DOWNLOADS_DIR}/apptainer-${APPTAINER_VERSION}.deb"
+        dpkg --install --force-depends "$_" && apt-get install --fix-broken --yes --quiet "$_"
+        apptainer --version 
     - name: Build Container
       run: |
-        set -eux
-        [ -n "${BASH_VERSION:-}" ] && set -o pipefail
+        set -euxo pipefail
         export APPTAINER_CACHE_DIR="$(realpath .setup-downloads/apptainer-cache)"
         mkdir -p .setup-downloads
         mkdir -p sif
@@ -92,9 +96,8 @@ jobs:
         popd
     - name: Login and Deploy Container
       run: |
-        set -eux
-        [ -n "${BASH_VERSION:-}" ] && set -o pipefail
-        [ -r "sif/${IMAGE_NAME}.sif" ] || { echo "No container named sif/${IMAGE_NAME:-}.sif found."; exit 1; }
+        set -euxo pipefail
+        [[ -r "sif/${IMAGE_NAME}.sif" ]] || { echo "No container named sif/${IMAGE_NAME:-}.sif found."; exit 1; }
         echo "Container size:"
         du -h "sif/${IMAGE_NAME}.sif"
         echo "Disk usage:"
@@ -103,4 +106,3 @@ jobs:
         apptainer remote login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} oras://ghcr.io
         apptainer push -U "sif/${IMAGE_NAME}.sif" oras://ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} || { echo "Failed to push \"sif/${IMAGE_NAME}.sif\' to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"; exit 1; }
         echo "Pushed \"sif/${IMAGE_NAME}.sif\" to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
-        
