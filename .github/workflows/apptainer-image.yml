@@ -23,7 +23,7 @@ jobs:
     steps:
     - name: Check out code for the container build
       uses: actions/checkout@v4
-    - name: Cache CURL downloads
+    - name: Cache downloads in SETUP_DOWNLOADS_DIR
       uses: actions/cache@v3
       with:
         path: ${{ env.SETUP_DOWNLOADS_DIR }}
@@ -86,7 +86,6 @@ jobs:
       run: |
         set -euxo pipefail
         export APPTAINER_CACHE_DIR="$(realpath .setup-downloads/apptainer-cache)"
-        mkdir -p .setup-downloads
         mkdir -p sif
         pushd  "${DEF_DIR}"
         echo "Building \"${IMAGE_NAME}.sif\""
