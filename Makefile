@@ -81,5 +81,5 @@ clean-all: clean-containers clean-downloads ## Remove all built containers, all 
 $(CONTAINERDIR)/*.sif:: bin/write-apptainer-labels.sh | $(CONTAINERDIR)
 
 $(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif:: def/hyakvnc-vncserver-ubuntu22.04/hyakvnc-vncserver.sh $(shell find ./common/configs/ubuntu)
-$(CONTAINERDIR)/hyakvnc-%-ubuntu22.04-%.sif:: $(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif common/scripts/install-freesurfer.sh $(shell find ./common/configs/freesurfer)
+$(CONTAINERDIR)/hyakvnc-%-ubuntu22.04-%.sif:: $(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif $(shell find ./common/configs/freesurfer)
 
