@@ -16,7 +16,7 @@ HOSTTYPE="${HOSTTYPE:-$(uname -m || true)}"
 OSTYPE="${OSTYPE:-$(uname -s || true)}"
 PLATFORM="${PLATFORM:-${OSTYPE}-${HOSTTYPE}}"
 
-export TVNC_WM=${TVNC_WM:-xfce}
+export TVNC_WM="${TVNC_WM:-xfce}"
 export VNC_PASSWORD="${VNC_PASSWORD:-password}"
 export VNC_DISPLAY="${VNC_DISPLAY:-:10}"
 export VNC_USER_DIR="${VNC_USER_DIR:-/tmp/${USER}-vnc}"
@@ -91,7 +91,7 @@ Examples:
 EOF
 }
 
-function main() {
+function run_hyakvnc_vncserver() {
 	# Parse arguments:
 	while (($# > 0)); do
 		case ${1:-} in
@@ -195,4 +195,4 @@ function main() {
 	vncserver "${@}"
 }
 
-main "${@}"
+! (return 0 2>/dev/null) || run_hyakvnc_vncserver "$@"
