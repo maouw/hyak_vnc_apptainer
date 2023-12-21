@@ -95,7 +95,7 @@ function main() {
 				;;
 			--version) echo "${PROGNAME} version ${PROG_VERSION:-}"; return 0 ;;
 			--generate)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho "$1 requires an argument"; return 1; }
 				case "${1:-}" in
 					apptainer | singularity)
 						NEURODOCKER_GENERATE_FORMAT="apptainer"
@@ -110,16 +110,16 @@ function main() {
 				esac
 				;;
 			--template-path)
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho "$1 requires an argument"; return 1; }
 				NEURODOCKER_TEMPLATE_PATH="${1:-}"
 				[[ -n "${NEURODOCKER_TEMPLATE_PATH:-}" ]] || [[ -d "${NEURODOCKER_TEMPLATE_PATH:-}" ]] || { _errecho "No directory at \"${NEURODOCKER_TEMPLATE_PATH:-}\". Exiting."; return 1; }
 				;;
 			--base-image) # Set the base image
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho "$1 requires an argument"; return 1; }
 				base_image_url="${1:-}"
 				;;
 			--bootstrap) # Set the bootstrap type
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho "$1 requires an argument"; return 1; }
 				bootstrap_type="${1:-}"
 				;;
 			--write-build-labels)
@@ -128,17 +128,17 @@ function main() {
 			--no-nd-base-fix)
 				no_nd_base_fix=1
 				;;
-			--output) # Set the output file
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+			--output) # Set the output files
+				shift || { _errecho "$1 requires an argument"; return 1; }
 				output_file="${1:-}"
 				mkdir -p "$(dirname "${output_file}")" || { _errecho "Could not create directory \"$(dirname "${output_file}")\". Exiting."; return 1; }
 				;;
 			--neurodocker-runner-image) # Set the neurodocker runner image to use
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho "$1 requires an argument"; return 1; }
 				NEURODOCKER_IMAGE="${1:-}"
 				;;
 			--neurodocker-runner) # Set the neurodocker runner to use
-				shift || { log ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho "$1 requires an argument"; return 1; }
 				case "${1:-}" in
 					apptainer | singularity | docker | neurodocker)
 						NEURODOCKER_RUNNER="${1:-}"
