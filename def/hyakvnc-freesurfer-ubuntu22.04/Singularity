@@ -9,6 +9,8 @@ From: {{BOOTSTRAP_FROM_REPO}}/hyakvnc-vncserver-ubuntu22.04{{BOOTSTRAP_FROM_SUFF
 	FREESURFER_DOWNLOAD_URL=https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/{{FREESURFER_VERSION}}/freesurfer_ubuntu22-{{FREESURFER_VERSION}}_amd64.deb
 	FREESURFER_DOWNLOAD_FILENAME=freesurfer_ubuntu22-{{FREESURFER_VERSION}}_amd64.deb
 	SETUP_DOWNLOADS_DIR=../../.setup-downloads
+	RECON_ALL_CLINICAL_HASH=ecdf46e
+	RECON_ALL_CLINICAL_URL=https://raw.githubusercontent.com/freesurfer/freesurfer/{{RECON_ALL_CLINICAL_HASH}}/recon_all_clinical/recon-all-clinical.sh
 
 %help
 	This is an Apptainer container of Ubuntu 22.04 with TurboVNC, XFCE, and FreeSurfer installed.
@@ -75,3 +77,13 @@ From: {{BOOTSTRAP_FROM_REPO}}/hyakvnc-vncserver-ubuntu22.04{{BOOTSTRAP_FROM_SUFF
 
 	# Clean up packages:
 	apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
+
+	# Link /usr/local/freesurfer/dev to /usr/local/freesurfer/{{FREESURFER_VERSION}}:
+	# (fixes some scripts that expect this)
+	ln -s "/usr/local/freesurfer/{{FREESURFER_VERSION}}" /usr/local/freesurfer/dev
+
+	# Patch recon-all-clinical.sh to fix a bug with FREESURFER_HOME location:
+	[ -n "{{RECON_ALL_CLINICAL_URL}}" ] && curl --fail --fail-early --compressed --location \
+		--continue-at - \
+		--output /usr/local/freesurfer/{{FREESURFER_VERSION}}/bin/recon-all-clinical.sh \
+		"{{RECON_ALL_CLINICAL_URL}}" || { echo "warning: curl failed!" >&2; exit 1; }
