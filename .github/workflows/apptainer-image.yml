@@ -64,7 +64,7 @@ jobs:
         
         # Add bootstrap args for derived containers
         echo "BOOTSTRAP_SOURCE=oras" >> "${DEF_DIR}/.build-arg-file"
-        echo "BOOTSTRAP_IMAGE_NAME="${BASE_IMAGE_NAME:-}" >> "${DEF_DIR}/.build-arg-file"
+        echo "BOOTSTRAP_IMAGE_NAME=${BASE_IMAGE_NAME:-}" >> "${DEF_DIR}/.build-arg-file"
         echo "BOOTSTRAP_FROM_REPO=ghcr.io/${{ github.repository }}" >> "${DEF_DIR}/.build-arg-file"
         echo "BOOTSTRAP_FROM_SUFFIX=:${BASE_IMAGE_TAG:-latest}" >> "${DEF_DIR}/.build-arg-file"
 
