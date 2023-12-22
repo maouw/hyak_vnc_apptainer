@@ -33,14 +33,15 @@ write_apptainer_labels() {
 
 		# If no image vendor is set, try to set it to the GitHub organization:
 		if [ -z "${IMAGE_VENDOR:=${IMAGE_VENDOR:-}}" ]; then
-			# If the GitHub organization is not set, try to set it to the GitHub organization of the upstream remote:
-			[ -z "${GH_ORG:-}" ] && GH_ORG="$(git remote get-url upstream | sed -n 's/.*github.com[:/]\([^/]*\)\/.*/\1/p' || true)"
-			# If the GitHub organization is not set, try to set it to the GitHub organization of the origin remote:
-			[ -z "${GH_ORG:-}" ] && GH_ORG="$(git remote get-url origin | sed -n 's/.*github.com[:/]\([^/]*\)\/.*/\1/p' || true)"
 
+			if git remote | grep -q  '^upstream$'; then 
+				# If the GitHub organization is not set, try to set it to the GitHub organization of the upstream remote:
+				[ -z "${GH_ORG:-}" ] && GH_ORG="$(git remote get-url upstream | sed -n 's/.*github.com[:/]\([^/]*\)\/.*/\1/p' || true)"
+				# If the GitHub organization is not set, try to set it to the GitHub organization of the origin remote:
+				[ -z "${GH_ORG:-}" ] && GH_ORG="$(git remote get-url origin | sed -n 's/.*github.com[:/]\([^/]*\)\/.*/\1/p' || true)"
+			fi
 			# Assign the image vendor to the GitHub organization or username if it is set, otherwise leave it empty:
 			IMAGE_VENDOR="${GH_ORG:-}"
-
 			# If the GitHub organization is set to uw-psych, set the image vendor to the University of Washington Department of Psychology:
 			[ "${IMAGE_VENDOR:-}" = 'uw-psych' ] && IMAGE_VENDOR='University of Washington Department of Psychology'
 		fi

@@ -81,19 +81,37 @@ jobs:
     - name: Delete GitHub AGENT_TOOLSDIRECTORY to free space
       run: |
         set -euxo pipefail
-        echo "Disk space before:" && df -h
+        echo "Disk space before:" && df -hl
         sudo rm -rf /opt/hostedtoolcache; echo "Done removing /opt/hostedtoolcache"
+        echo "Disk space after:" && df -hl
     - name: Delete .NET, Android, Haskell tools to free space
       run: |
         set -euxo pipefail
-        echo "Disk space before:" && df -h
+        echo "Disk space before:" && df -hl
         sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android && echo "Done removing .NET, Android, and Haskell tools."
+        echo "Disk space after:" && df -hl
     - name: Download and Install Apptainer
       run: |
         set -euxo pipefail
-        [[ -r "${SETUP_DOWNLOADS_DIR}/apptainer-${APPTAINER_VERSION}.deb" ]] || curl -L https://github.com/apptainer/apptainer/releases/download/v${APPTAINER_VERSION}/apptainer_${APPTAINER_VERSION}_amd64.deb -o "${SETUP_DOWNLOADS_DIR}/apptainer-${APPTAINER_VERSION}.deb"
+        APPTAINER_LATEST_TAGNAME="$(gh release view --repo apptainer/apptainer --json tagName -t '{{.tagName}}' | head -n 1)"
+        [[ -n "${APPTAINER_LATEST_TAGNAME}" ]] || { echo "No latest tag found for apptainer/apptainer"; exit 1; }
+        echo "Latest tag for apptainer/apptainer is \"${APPTAINER_LATEST_TAGNAME}\""
+        gh release download --repo apptainer/apptainer --pattern 'apptainer_*_amd64.deb' --dir "${SETUP_DOWNLOADS_DIR}" "${APPTAINER_LATEST_TAGNAME}"
         sudo dpkg --install --force-depends "$_" && sudo apt-get install --fix-broken --yes --quiet
-        apptainer --version 
+        apptainer --version
+    - name: Download and Install oras-cli
+      run: |
+        set -euxo pipefail
+        ORAS_LATEST_TAGNAME="$(gh release view --repo oras-project/oras --json tagName -t '{{.tagName}}' | head -n 1)"
+        [[ -n "${ORAS_LATEST_TAGNAME}" ]] || { echo "No latest tag found for oras-project/oras"; exit 1; }
+        echo "Latest tag for oras-project/oras is \"${ORAS_LATEST_TAGNAME}\""
+        gh release download --repo oras-project/oras --pattern '*linux_amd64.tar.gz' --dir "${SETUP_DOWNLOADS_DIR}" "${ORAS_LATEST_TAGNAME}"
+        sudo mkdir -p /opt/local/bin
+        sudo tar -xzf "${SETUP_DOWNLOADS_DIR}/oras_${ORAS_LATEST_TAGNAME}_linux_amd64.tar.gz" -C /opt/local/bin oras && sudo chmod +x /opt/local/bin/oras
+        export PATH="/opt/local/bin:${PATH}"
+        echo "PATH=${PATH}" >> $GITHUB_ENV
+        rehash
+        oras --version
     - name: Build Container
       run: |
         set -euxo pipefail
@@ -117,3 +135,9 @@ jobs:
         apptainer remote login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} oras://ghcr.io
         apptainer push -U "sif/${IMAGE_NAME}.sif" oras://ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} || { echo "Failed to push \"sif/${IMAGE_NAME}.sif\' to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"; exit 1; }
         echo "Pushed \"sif/${IMAGE_NAME}.sif\" to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
+        
+        # Add "latest" tag if IMAGE_TAG is not latest
+        if [[ "${IMAGE_TAG}" != "latest" ]]; then
+          oras login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} ghcr.io
+          oras tag ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} latest
+        fi
