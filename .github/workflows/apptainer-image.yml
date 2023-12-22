@@ -112,7 +112,6 @@ jobs:
         sudo tar -xzf "${SETUP_DOWNLOADS_DIR}/oras_${ORAS_LATEST_TAGNAME}_linux_amd64.tar.gz" -C /opt/local/bin oras && sudo chmod +x /opt/local/bin/oras
         export PATH="/opt/local/bin:${PATH}"
         echo "PATH=${PATH}" >> $GITHUB_ENV
-        rehash
         oras --version
     - name: Build Container
       run: |
