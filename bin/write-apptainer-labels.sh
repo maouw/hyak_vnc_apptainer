@@ -4,7 +4,7 @@
 # Write the build labels to the build labels path for both the org.label-schema and org.opencontainers.image formats
 
 [ -n "${XDEBUG:-}" ] && set -x
-
+set -eu
 write_to_build_labels() {
 	while [ $# -gt 1 ]; do
 		eval "[ -n \"\${$#}\" ] && printf '%s %s\n' \"$1\" \"\${$#}\"" >>"${BUILD_LABELS_PATH:-/dev/stdout}"
@@ -27,7 +27,6 @@ write_apptainer_labels() {
 		IMAGE_VCS_URL="${IMAGE_VCS_URL:-$(git remote get-url origin || true)}"                                            # Set the default VCS URL to the origin remote
 		[ -z "${IMAGE_URL:-}" ] && [ -n "${IMAGE_VCS_URL:-}" ] && IMAGE_URL="${IMAGE_VCS_URL%%.git}"                      # Set the default URL to the VCS URL without the .git extension
 		IMAGE_VCS_REF="${IMAGE_VCS_REF:-$(git rev-parse --short HEAD || true)}"                                           # Set the default VCS ref to the short hash of HEAD
-		IMAGE_TAG="${IMAGE_TAG:-"$(git tag --points-at HEAD --list '*@*' --sort=-"creatordate:iso" | sed 's/.*@//;1q')"}" # Set the default tag to the most recent tag matching the format *@* sorted by date
 		IMAGE_TAG="${IMAGE_TAG:-latest}"                                                                                  # Set the default tag to latest if no tag was found
 		IMAGE_TITLE="${IMAGE_TITLE:-"${PWD##*/}"}"                                                                        # Set the default title to the current directory name
 		IMAGE_VERSION="${IMAGE_VERSION:-${IMAGE_TAG:-}}"                                                                  # Set the default version to the tag if set, otherwise the tag if set, otherwise empty

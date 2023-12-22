@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-set -o pipefail
-
-[[ -n "${XDEBUG:-}" ]] && set -x
+set -euo pipefail
+[[ "${XDEBUG:-0}" =~ ^[1yYtT] ]] && set -x
 
 IMAGE_TAG_SEP="@"
 
@@ -72,9 +71,14 @@ git tag -l --format='%(contents)' "$(git describe --tags --abbrev=0 || true)"
 
 if [[ -t 1 ]]; then
 	choice=y
-	read -rp "Do you want to push to origin? [Y/n] " choice
-	[[ "${choice:-y}" =~ ^[Yy]$ ]] || exit 0
-fi
 
-echo "Pushing to origin: ${GIT_TAG}"
-git push -f origin "${GIT_TAG}"
+	if git remote get-url origin 2>/dev/null 1>&2; then
+		read -rp "Do you want to push to origin? [Y/n] " choice
+		[[ "${choice:-y}" =~ ^[Yy]$ ]] && git push -f origin "${GIT_TAG}"
+	fi
+
+	if git remote get-url upstream 2>/dev/null 1>&2; then
+		read -rp "Do you want to push to upstream? [Y/n] " choice
+		[[ "${choice:-y}" =~ ^[Yy]$ ]] && git push -f upstream "${GIT_TAG}"
+	fi
+fi

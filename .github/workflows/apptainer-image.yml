@@ -1,8 +1,18 @@
 name: Build and Deploy Apptainer Container
 on:
-  push:
-    tags:
-    - "*@*"
+  workflow_dispatch:
+    inputs:
+      image_name:
+        description: 'Name of the container to build and deploy'
+        required: true
+      image_tag:
+        description: 'Tag of the container to build and deploy'
+        required: false
+        default: 'latest'
+      base_image_tag:
+        description: 'Tag of the base image to use'
+        required: false
+        default: 'latest'
 
 defaults:
   run:
@@ -34,8 +44,8 @@ jobs:
     - name: Get container name
       run: |
         set -euxo pipefail
-        # Get container name from tag
-        [[ -n "${IMAGE_NAME:=${GITHUB_REF_NAME%%@*}}" ]] || { echo "No container name found." ; exit 1; }
+        IMAGE_NAME="${{ inputs.image_name }}"
+        [[ -n "${IMAGE_NAME:-}" ]] || { echo "No container name found." ; exit 1; }
         echo "Container name is \"${IMAGE_NAME:-}\"" 
         echo "IMAGE_NAME="${IMAGE_NAME}"" >> $GITHUB_ENV
 
@@ -43,7 +53,7 @@ jobs:
         [[ -f "${DEF_DIR}/Singularity" ]] || { echo "No definition file found at \"${DEF_DIR}/Singularity\"" ; exit 1; }
         echo "DEF_DIR=${DEF_DIR}" >> $GITHUB_ENV
 
-        IMAGE_TAG="${IMAGE_TAG:-${GITHUB_REF_NAME##*@}}"
+        IMAGE_TAG="${{ inputs.image_tag }}"
         IMAGE_TAG="${IMAGE_TAG:-latest}"
         echo "Container tag is \"${IMAGE_TAG:-}\""
         echo "IMAGE_TAG="${IMAGE_TAG}"" >> $GITHUB_ENV
@@ -53,14 +63,11 @@ jobs:
         if [[ -n "${BOOTSTRAP_FROM_IMAGE}" ]]; then
           BASE_IMAGE_NAME="${BOOTSTRAP_FROM_IMAGE}"
           echo "Base image name is \"${BASE_IMAGE_NAME}\""
-          echo "BASE_IMAGE_NAME=\"${BASE_IMAGE_NAME}\"" >> $GITHUB_ENV 
-          BASE_IMAGE_TAG="$(git tag --sort=-"creatordate:iso" --list '*'"${BASE_IMAGE_NAME:-}"'*' |  sed -E '/.*@.*/!d; s/(.*)@(.+$)/\2/;1q' || true)"
+          echo "BASE_IMAGE_NAME=\"${BASE_IMAGE_NAME}\"" >> $GITHUB_ENV
+          BASE_IMAGE_TAG="${{ inputs.base_image_tag }}"
           BASE_IMAGE_TAG="${BASE_IMAGE_TAG:-latest}"
           echo "Base image tag is \"{BASE_IMAGE_TAG}\"" && echo "BASE_IMAGE_TAG=\"${BASE_IMAGE_TAG}\"" >> $GITHUB_ENV
         fi
-        
-        # Get build-arg-file contents
-        git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" | sed -E '/^.+=.*$/!d'>> "${DEF_DIR}/.build-arg-file"
         
         # Add bootstrap args for derived containers
         echo "BOOTSTRAP_SOURCE=oras" >> "${DEF_DIR}/.build-arg-file"
