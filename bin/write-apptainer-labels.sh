@@ -4,7 +4,7 @@
 # Write the build labels to the build labels path for both the org.label-schema and org.opencontainers.image formats
 
 [ -n "${XDEBUG:-}" ] && set -x
-set -eu
+
 write_to_build_labels() {
 	while [ $# -gt 1 ]; do
 		eval "[ -n \"\${$#}\" ] && printf '%s %s\n' \"$1\" \"\${$#}\"" >>"${BUILD_LABELS_PATH:-/dev/stdout}"
