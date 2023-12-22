@@ -15,6 +15,7 @@ CONTAINERDIR := $(PWD)/sif
 $(CONTAINERDIR):
 	@mkdir -p $@
 
+
 # Make targets for each directory that contains a Singularity file
 # (allows you to build a single container with `make <container_name>`):
 SUBDIRS := $(patsubst def/%/Singularity,%,$(wildcard def/*/Singularity))
@@ -22,7 +23,7 @@ SUBDIRS := $(patsubst def/%/Singularity,%,$(wildcard def/*/Singularity))
 $(SUBDIRS): %: ${CONTAINERDIR}/%.sif
 
 # Build target for each container:
-${CONTAINERDIR}/%.sif: def/%/Singularity | $(CONTAINERDIR)
+${CONTAINERDIR}/%.sif: def/%/Singularity bin/write-apptainer-labels.sh | $(CONTAINERDIR)
 ifeq (, $(shell command -v apptainer 2>/dev/null))
 	$(error "No apptainer in $(PATH). If you're on klone, you should be on a compute node")
 endif
@@ -78,8 +79,7 @@ clean-all: clean-containers clean-downloads ## Remove all built containers, all 
 
 .DEFAULT_GOAL := help
 
-$(CONTAINERDIR)/*.sif:: bin/write-apptainer-labels.sh | $(CONTAINERDIR)
 
 $(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif:: def/hyakvnc-vncserver-ubuntu22.04/hyakvnc-vncserver.sh $(shell find ./common/configs/ubuntu)
-$(CONTAINERDIR)/hyakvnc-%-ubuntu22.04-%.sif:: $(CONTAINERDIR)/hyakvnc-vncserver-ubuntu22.04.sif $(shell find ./common/configs/freesurfer)
-
+$(CONTAINERDIR)/hyakvnc-freesurfer-ubuntu22.04.sif:: sif/hyakvnc-vncserver-ubuntu22.04.sif $(shell find ./common/configs/freesurfer)
+$(CONTAINERDIR)/hyakvnc-freesurfer-matlab-ubuntu22.04.sif:: sif/hyakvnc-freesurfer-ubuntu22.04.sif

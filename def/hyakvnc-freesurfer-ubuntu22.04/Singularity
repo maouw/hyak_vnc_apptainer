@@ -1,9 +1,10 @@
 Bootstrap: {{BOOTSTRAP_SOURCE}}
-From: {{BOOTSTRAP_FROM_REPO}}/hyakvnc-vncserver-ubuntu22.04{{BOOTSTRAP_FROM_SUFFIX}}
+From: {{BOOTSTRAP_FROM_REPO}}/{{BOOTSTRAP_FROM_IMAGE}}{{BOOTSTRAP_FROM_SUFFIX}}
 
 %arguments
 	BOOTSTRAP_SOURCE=localimage
 	BOOTSTRAP_FROM_REPO=../../sif
+	BOOTSTRAP_FROM_IMAGE=hyakvnc-vncserver-ubuntu22.04
 	BOOTSTRAP_FROM_SUFFIX=.sif
 	FREESURFER_VERSION=7.4.1
 	FREESURFER_DOWNLOAD_URL=https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/{{FREESURFER_VERSION}}/freesurfer_ubuntu22-{{FREESURFER_VERSION}}_amd64.deb
@@ -13,8 +14,7 @@ From: {{BOOTSTRAP_FROM_REPO}}/hyakvnc-vncserver-ubuntu22.04{{BOOTSTRAP_FROM_SUFF
 	RECON_ALL_CLINICAL_URL=https://raw.githubusercontent.com/freesurfer/freesurfer/{{RECON_ALL_CLINICAL_HASH}}/recon_all_clinical/recon-all-clinical.sh
 
 %help
-	This is an Apptainer container of Ubuntu 22.04 with TurboVNC, XFCE, and FreeSurfer installed.
-	It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
+This is an Apptainer container of Ubuntu 22.04 with FreeSurfer installed. It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
 
 %setup
 	[ -n "${APPTAINER_ROOTFS:-}" ] && ../../bin/write-apptainer-labels.sh > "${APPTAINER_ROOTFS}/.build_labels"
@@ -22,28 +22,39 @@ From: {{BOOTSTRAP_FROM_REPO}}/hyakvnc-vncserver-ubuntu22.04{{BOOTSTRAP_FROM_SUFF
 	if ! [ -r "{{SETUP_DOWNLOADS_DIR}}/{{FREESURFER_DOWNLOAD_FILENAME}}" ]; then
 		command -v curl >/dev/null 2>&1 || { echo "warning: curl not found!" >&2; exit 1; }
 		curl --fail --fail-early --compressed --location \
-			--continue-at - \
 			--output "{{SETUP_DOWNLOADS_DIR}}/{{FREESURFER_DOWNLOAD_FILENAME}}" \
 			"{{FREESURFER_DOWNLOAD_URL}}" || { echo "warning: curl failed!" >&2; rm -fv "{{SETUP_DOWNLOADS_DIR}}/{{FREESURFER_DOWNLOAD_FILENAME}}" >&2; exit 1; }
 		echo "Downloaded \"{{FREESURFER_DOWNLOAD_FILENAME}}\" from \"{{FREESURFER_DOWNLOAD_URL}}\"."
 	fi
 	ln -v "{{SETUP_DOWNLOADS_DIR}}/{{FREESURFER_DOWNLOAD_FILENAME}}" "${APPTAINER_ROOTFS}/freesurfer.deb" || { echo "warning: ln failed!" >&2; exit 1; }
 	
-
-%labels
-	org.label-schema.description An Apptainer container of Ubuntu 22.04 with TurboVNC and FreeSurfer installed.
-	edu.uw.hyakvnc.container.resources.recommends.mem 16G
-	edu.uw.hyakvnc.container.resources.requires.mem 8G
-	edu.uw.hyakvnc.container.resources.recommends.cpus 4
-	edu.uw.hyakvnc.container.resources.requires.cpus 1
-	edu.uw.hyakvnc.container.resources.suggests.gpus 1
-
-%help
-	This is an Apptainer container of Ubuntu 22.04 with TurboVNC and FreeSurfer installed.
-
 %files
 	../../common/configs/freesurfer/start-freeview.sh /usr/local/bin/start-freeview
 	../../common/configs/freesurfer/freeview.desktop /usr/share/applications/freeview.desktop
+
+%post
+	set -eux
+	export DEBIAN_FRONTEND=noninteractive
+
+	# Update the package list:
+	apt-get update -y -qq
+
+	# Install FreeSurfer:
+	dpkg --install --force-depends /freesurfer.deb && apt-get install --fix-broken --yes --quiet
+	unlink /freesurfer.deb
+
+	# Link /usr/local/freesurfer/dev to /usr/local/freesurfer/{{FREESURFER_VERSION}}:
+	# (fixes some scripts that expect this)
+	ln -s "/usr/local/freesurfer/{{FREESURFER_VERSION}}" /usr/local/freesurfer/dev
+
+	# Patch recon-all-clinical.sh to fix a bug with FREESURFER_HOME location:
+	[ -n "{{RECON_ALL_CLINICAL_URL}}" ] && curl --fail --fail-early --compressed --location \
+		--output /usr/local/freesurfer/{{FREESURFER_VERSION}}/bin/recon-all-clinical.sh \
+		"{{RECON_ALL_CLINICAL_URL}}" || { echo "warning: curl failed!" >&2; exit 1; }
+	chmod a+x /usr/local/freesurfer/{{FREESURFER_VERSION}}/bin/recon-all-clinical.sh
+
+	# Clean up packages:
+	apt-get clean -y -qq && apt-get -y autoremove && rm -rf /var/lib/apt/lists/*
 
 %environment
 	export FREESURFER_HOME="/usr/local/freesurfer/{{FREESURFER_VERSION}}"
@@ -64,26 +75,10 @@ From: {{BOOTSTRAP_FROM_REPO}}/hyakvnc-vncserver-ubuntu22.04{{BOOTSTRAP_FROM_SUFF
 	export PATH="${FREESURFER_HOME}/bin:${FREESURFER_HOME}/tktools:${MINC_BIN_DIR}:$PATH"
 	export FS_LICENSE="${FS_LICENSE:-${HOME}/${USER}/.freesurfer_license.txt}"
 
-%post
-	set -eux
-	export DEBIAN_FRONTEND=noninteractive
+%labels
+	edu.uw.hyakvnc.container.resources.recommends.mem 16G
+	edu.uw.hyakvnc.container.resources.requires.mem 8G
+	edu.uw.hyakvnc.container.resources.recommends.cpus 4
+	edu.uw.hyakvnc.container.resources.requires.cpus 1
+	edu.uw.hyakvnc.container.resources.suggests.gpus 1
 
-	# Update the package list:
-	apt-get update -y -qq
-
-	# Install FreeSurfer:
-	dpkg --install --force-depends /freesurfer.deb && apt-get install --fix-broken --yes --quiet
-	unlink /freesurfer.deb
-
-	# Clean up packages:
-	apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
-
-	# Link /usr/local/freesurfer/dev to /usr/local/freesurfer/{{FREESURFER_VERSION}}:
-	# (fixes some scripts that expect this)
-	ln -s "/usr/local/freesurfer/{{FREESURFER_VERSION}}" /usr/local/freesurfer/dev
-
-	# Patch recon-all-clinical.sh to fix a bug with FREESURFER_HOME location:
-	[ -n "{{RECON_ALL_CLINICAL_URL}}" ] && curl --fail --fail-early --compressed --location \
-		--continue-at - \
-		--output /usr/local/freesurfer/{{FREESURFER_VERSION}}/bin/recon-all-clinical.sh \
-		"{{RECON_ALL_CLINICAL_URL}}" || { echo "warning: curl failed!" >&2; exit 1; }

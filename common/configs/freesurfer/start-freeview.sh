@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# shellcheck shell=bash
 [[ "${XDEBUG:-0}" =~ ^[1yYtT] ]] && set -x
 
 set -o pipefail

@@ -2,9 +2,7 @@ Bootstrap: docker
 From: ubuntu:22.04
 
 %help
-	This is an Apptainer container of Ubuntu 22.04 with TurboVNC and XFCE installed.
-	It is intended to be used as a base for other containers that need a VNC server.
-	It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
+This is an Apptainer container of Ubuntu 22.04 with TurboVNC and XFCE installed. It is intended to be used as a base for other containers that need a VNC server. It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
 
 %arguments
 	TURBOVNC_VERSION=3.1
@@ -24,7 +22,6 @@ From: ubuntu:22.04
 		echo "Downloaded \"{{TURBOVNC_DOWNLOAD_FILENAME}}\" from \"{{TURBOVNC_DOWNLOAD_URL}}\"."
 	fi
 	ln -v "{{SETUP_DOWNLOADS_DIR}}/{{TURBOVNC_DOWNLOAD_FILENAME}}" "${APPTAINER_ROOTFS}/turbovnc.deb" || { echo "warning: ln failed!" >&2; exit 1; }
-	
 
 %labels
 	edu.uw.hyakvnc.container.resources.recommends.mem 4G
@@ -35,15 +32,6 @@ From: ubuntu:22.04
 %files
 	../../common/configs/ubuntu /opt/setup/configs
 	./hyakvnc-vncserver.sh /opt/local/bin/hyakvnc-vncserver
-
-%environment
-{
-	export LANG=en_US.utf8
-	export LC_ALL=en_US.utf8
-	export LC_COLLATE=C
-	export SHELL="${SHELL:-/bin/bash}"
-	export PATH="/opt/local/bin:/opt/TurboVNC/bin:${PATH}"
-}
 
 %post
 {
@@ -165,6 +153,13 @@ From: ubuntu:22.04
 	# Clean up packages:
 	apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
 }
+
+%environment
+	export LANG=en_US.utf8
+	export LC_ALL=en_US.utf8
+	export LC_COLLATE=C
+	export SHELL="${SHELL:-/bin/bash}"
+	export PATH="/opt/local/bin:/opt/TurboVNC/bin:${PATH}"
 
 %runscript
 {

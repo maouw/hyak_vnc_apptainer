@@ -4,14 +4,14 @@ From: {{BOOTSTRAP_FROM_REPO}}/{{BOOTSTRAP_FROM_IMAGE}}{{BOOTSTRAP_FROM_SUFFIX}}
 %arguments
 	BOOTSTRAP_SOURCE=localimage
 	BOOTSTRAP_FROM_REPO=../../sif
-	BOOTSTRAP_FROM_IMAGE=hyakvnc-vncserver-ubuntu22.04
+	BOOTSTRAP_FROM_IMAGE=hyakvnc-freesurfer-ubuntu22.04
 	BOOTSTRAP_FROM_SUFFIX=.sif
 	MATLAB_RELEASE=r2023b
 	MATLAB_PRODUCT_LIST=MATLAB
 	MATLAB_INSTALL_LOCATION=/opt/matlab/{{MATLAB_RELEASE}}
 
 %help
-	This is an Apptainer container of Ubuntu 22.04 with Matlab installed on top of the hyakvnc-vncserver-ubuntu22.04 container.
+	This is an Apptainer container of Ubuntu 22.04 with Matlab installed on top of the hyakvnc-freesurfer-ubuntu22.04 container.
 
 %setup
 	[ -n "${APPTAINER_ROOTFS:-}" ] && ../../bin/write-apptainer-labels.sh > "${APPTAINER_ROOTFS}/.build_labels"
@@ -130,7 +130,7 @@ From: {{BOOTSTRAP_FROM_REPO}}/{{BOOTSTRAP_FROM_IMAGE}}{{BOOTSTRAP_FROM_SUFFIX}}
 	[ -d /usr/share/X11/xkb ] || mkdir -p /usr/share/X11/xkb
 
 %environment
-	LICENSE_SERVER="${LICENSE_SERVER:-}"
+	export LICENSE_SERVER="${LICENSE_SERVER:-}"
 
 %runscript
 	matlab "$@"
