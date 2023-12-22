@@ -23,6 +23,10 @@ jobs:
     steps:
     - name: Check out code for the container build
       uses: actions/checkout@v4
+    - name: Create SETUP_DOWNLOADS_DIR
+      run: |
+        set -euxo pipefail
+        mkdir -p "${SETUP_DOWNLOADS_DIR}"
     - name: Cache downloads in SETUP_DOWNLOADS_DIR
       uses: actions/cache@v3
       with:
