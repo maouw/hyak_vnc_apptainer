@@ -85,7 +85,7 @@ jobs:
       run: |
         set -euxo pipefail
         [[ -r "${SETUP_DOWNLOADS_DIR}/apptainer-${APPTAINER_VERSION}.deb" ]] || curl -L https://github.com/apptainer/apptainer/releases/download/v${APPTAINER_VERSION}/apptainer_${APPTAINER_VERSION}_amd64.deb -o "${SETUP_DOWNLOADS_DIR}/apptainer-${APPTAINER_VERSION}.deb"
-        dpkg --install --force-depends "$_" && apt-get install --fix-broken --yes --quiet "$_"
+        sudo dpkg --install --force-depends "$_" && sudo apt-get install --fix-broken --yes --quiet "$_"
         apptainer --version 
     - name: Build Container
       run: |
