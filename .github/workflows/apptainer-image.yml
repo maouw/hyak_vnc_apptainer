@@ -21,6 +21,7 @@ defaults:
 env:
   APPTAINER_VERSION: 1.2.5
   SETUP_DOWNLOADS_DIR: .setup-downloads
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
   build-and-push-image:
@@ -135,7 +136,7 @@ jobs:
         apptainer remote login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} oras://ghcr.io
         apptainer push -U "sif/${IMAGE_NAME}.sif" oras://ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} || { echo "Failed to push \"sif/${IMAGE_NAME}.sif\' to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"; exit 1; }
         echo "Pushed \"sif/${IMAGE_NAME}.sif\" to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
-        
+
         # Add "latest" tag if IMAGE_TAG is not latest
         if [[ "${IMAGE_TAG}" != "latest" ]]; then
           oras login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} ghcr.io
