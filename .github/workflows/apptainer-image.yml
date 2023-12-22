@@ -11,7 +11,6 @@ defaults:
 env:
   APPTAINER_VERSION: 1.2.5
   SETUP_DOWNLOADS_DIR: .setup-downloads
-  APPTAINER_CACHE_DIR: "${SETUP_DOWNLOADS_DIR}/apptainer-cache"
 
 jobs:
   build-and-push-image:
@@ -91,7 +90,7 @@ jobs:
     - name: Build Container
       run: |
         set -euxo pipefail
-        export APPTAINER_CACHE_DIR="$(realpath .setup-downloads/apptainer-cache)"
+        export APPTAINER_CACHE_DIR="${SETUP_DOWNLOADS_DIR}/apptainer-cache"
         mkdir -p sif
         pushd  "${DEF_DIR}"
         echo "Building \"${IMAGE_NAME}.sif\""
