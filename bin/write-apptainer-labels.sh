@@ -55,6 +55,12 @@ write_apptainer_labels() {
 	fi
 	[ -z "${IMAGE_AUTHOR:-}" ] && IMAGE_AUTHOR="${GITHUB_REPOSITORY_OWNER:-}" # Set the default author to the GitHub repository owner if set
 
+	if [ -n "${IMAGE_DESCRIPTION:-}" ] && [ -n "${APPTAINER_ROOTFS:-}" ]; then
+		if [ -f "${APPTAINER_ROOTFS}/.singularity.d/runscript.help" ]; then
+			IMAGE_DESCRIPTION="$(sed -En 's/^\s*//g; s/\s*$//g; 1p' "${APPTAINER_ROOTFS}/.singularity.d/runscript.help")"
+		fi
+	fi
+
 	# Write the build labels to the build labels path for both the org.label-schema and org.opencontainers.image formats:
 	write_to_build_labels "org.label-schema.title" "org.opencontainers.image.title" "${IMAGE_TITLE:-}"
 	write_to_build_labels "org.label-schema.url" "org.opencontainers.image.url" "${IMAGE_URL:-}"
