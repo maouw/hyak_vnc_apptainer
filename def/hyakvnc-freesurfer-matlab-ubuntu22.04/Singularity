@@ -6,12 +6,12 @@ From: {{BOOTSTRAP_FROM_REPO}}/{{BOOTSTRAP_FROM_IMAGE}}{{BOOTSTRAP_FROM_SUFFIX}}
 	BOOTSTRAP_FROM_REPO=../../sif
 	BOOTSTRAP_FROM_IMAGE=hyakvnc-freesurfer-ubuntu22.04
 	BOOTSTRAP_FROM_SUFFIX=.sif
-	MATLAB_RELEASE=r2023b
-	MATLAB_PRODUCT_LIST=MATLAB
-	MATLAB_INSTALL_LOCATION=/opt/matlab/{{MATLAB_RELEASE}}
+	SETUP_DOWNLOADS_DIR=../../.setup-downloads
+  MCR_VERSION=R2014b
+  APT_CLEANUP=1
 
 %help
-	This is an Apptainer container of Ubuntu 22.04 with Matlab installed on top of the hyakvnc-freesurfer-ubuntu22.04 container.
+	This is an Apptainer container of Ubuntu 22.04 with Matlab runtimes installed on top of the hyakvnc-freesurfer-ubuntu22.04 container.
 
 %setup
 	[ -n "${APPTAINER_ROOTFS:-}" ] && ../../bin/write-apptainer-labels.sh > "${APPTAINER_ROOTFS}/.build_labels"
@@ -19,118 +19,16 @@ From: {{BOOTSTRAP_FROM_REPO}}/{{BOOTSTRAP_FROM_IMAGE}}{{BOOTSTRAP_FROM_SUFFIX}}
 %post
 	set -eux
 	export DEBIAN_FRONTEND=noninteractive
+  APT_CLEANUP="{{APT_CLEANUP}}"
 
 	# Update the package list:
 	apt-get update -y -qq
 
-	# Install MATLAB r2023b dependencies:
-	# (refer to https://raw.githubusercontent.com/mathworks-ref-arch/container-images/main/matlab-deps/r2023b/ubuntu22.04/Dockerfile)
-	apt-get install --no-install-recommends -y \
-		ca-certificates \
-		libasound2 \
-		libc6 \
-		libcairo-gobject2 \
-		libcairo2 \
-		libcap2 \
-		libcups2 \
-		libdrm2 \
-		libgbm1 \
-		libgdk-pixbuf-2.0-0 \
-		libgl1 \
-		libglib2.0-0 \
-		libgstreamer-plugins-base1.0-0 \
-		libgstreamer1.0-0 \
-		libgtk-3-0 \
-		libice6 \
-		libltdl7 \
-		libnspr4 \
-		libnss3 \
-		libpam0g \
-		libpango-1.0-0 \
-		libpangocairo-1.0-0 \
-		libpangoft2-1.0-0 \
-		libsndfile1 \
-		libuuid1 \
-		libwayland-client0 \
-		libxcomposite1 \
-		libxcursor1 \
-		libxdamage1 \
-		libxfixes3 \
-		libxft2 \
-		libxinerama1 \
-		libxrandr2 \
-		libxt6 \
-		libxtst6 \
-		libxxf86vm1 \
-		locales \
-		locales-all \
-		make \
-		net-tools \
-		procps \
-		unzip \
-		zlib1g
-	
-	# Install MATLAB r2023b runtime dependencies:
-	# (from https://github.com/mathworks-ref-arch/container-images/blob/main/matlab-runtime-deps/r2023b/ubuntu22.04/base-dependencies.txt)
-	apt-get install --no-install-recommends -y \
-		libcrypt1 \
-		libdw1 \
-		libgomp1 \
-		libodbc2 \
-		libodbcinst2 \
-		libsystemd0
-	
-	# Uncomment the following RUN apt-get statement if you will be using Simulink
-	# code generation capabilities, or if you will be compiling your own mex files
-	# with gcc, g++, or gfortran.
-	#
-	#apt-get install -y gcc g++ gfortran
+  # Install MCR dependencies:
+  apt-get install -y libxt-dev libxext-dev libncurses5
 
-	# Uncomment the following RUN apt-get statement to enable running a program
-	# that makes use of MATLAB's Engine API for C and Fortran
-	# https://www.mathworks.com/help/matlab/matlab_external/introducing-matlab-engine.html
-	#
-	apt-get install -y csh
+  # Install MCR:
+  fs_install_mcr "{{MCR_VERSION}}"
 
-	# Uncomment ALL of the following RUN apt-get statement to enable the playing of media files
-	# (mp3, mp4, etc.) from within MATLAB.
-	#
-	#apt-get install --no-install-recommends -y libgstreamer1.0-0 \
-	# gstreamer1.0-tools \
-	# gstreamer1.0-libav \
-	# gstreamer1.0-plugins-base \
-	# gstreamer1.0-plugins-good \
-	# gstreamer1.0-plugins-bad \
-	# gstreamer1.0-plugins-ugly
-	#
-
-	# Uncomment the following line if you require the fuse filesystem
-	#apt-get install --no-install-recommends -y libfuse2
-
-	# Uncomment the following line if you require firefox
-	#apt-get install --no-install-recommends -y firefox
-
-	# Uncomment to resolve any license manager issues
-	#ln -s /lib64/ld-linux-x86-64.so.2 /lib64/ld-lsb-x86-64.so.3
-	
-	# Clean up packages:
-	apt-get clean -y -qq && apt-get -y autoremove && rm -rf /var/lib/apt/lists/*
-
-	# Install MATLAB r2023b:
-	curl -fsSLO https://www.mathworks.com/mpm/glnxa64/mpm \
-    && chmod +x mpm \
-    && ./mpm install \
-    --release={{MATLAB_RELEASE}} \
-    --destination={{MATLAB_INSTALL_LOCATION}} \
-    --products {{MATLAB_PRODUCT_LIST}} \
-    || (echo "MPM Installation Failure. See below for more information:" && cat /tmp/mathworks_root.log && false) \
-    && rm -f mpm /tmp/mathworks_root.log \
-    && ln -s {{MATLAB_INSTALL_LOCATION}}/bin/matlab /usr/local/bin/matlab
-	rm -rf mpm
-	[ -d /usr/share/X11/xkb ] || mkdir -p /usr/share/X11/xkb
-
-%environment
-	export LICENSE_SERVER="${LICENSE_SERVER:-}"
-
-%runscript
-	matlab "$@"
+  # Clean up packages:
+  [ "${APT_CLEANUP:-0}" = 1 ] && apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
