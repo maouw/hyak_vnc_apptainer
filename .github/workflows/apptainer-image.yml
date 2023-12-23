@@ -123,7 +123,7 @@ jobs:
         echo "Latest tag for oras-project/oras is \"${ORAS_LATEST_TAGNAME}\""
         gh release download --repo oras-project/oras --pattern '*linux_amd64.tar.gz' --skip-existing -O "${SETUP_DOWNLOADS_DIR}/oras_${ORAS_LATEST_TAGNAME}.tar.gz" "${ORAS_LATEST_TAGNAME}"
         sudo mkdir -p /opt/local/bin
-        sudo tar -xzf "${SETUP_DOWNLOADS_DIR}/oras_${ORAS_LATEST_TAGNAME}_linux_amd64.tar.gz" -C /opt/local/bin oras && sudo chmod +x /opt/local/bin/oras
+        sudo tar -xzf "${SETUP_DOWNLOADS_DIR}/oras_${ORAS_LATEST_TAGNAME}.tar.gz" -C /opt/local/bin oras && sudo chmod +x /opt/local/bin/oras
         export PATH="/opt/local/bin:${PATH}"
         echo "PATH=${PATH}" >> $GITHUB_ENV
         oras version
