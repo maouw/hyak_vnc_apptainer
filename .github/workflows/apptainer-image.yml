@@ -7,7 +7,7 @@ on:
         description: 'Name of the container to build and deploy'
         required: true
         type: string
-      image_tag:
+      image_tags:
         description: 'Tags of the container to build and deploy'
         required: false
         default: 'latest'
@@ -63,8 +63,10 @@ jobs:
         [[ -f "${DEF_DIR}/Singularity" ]] || { echo "No definition file found at \"${DEF_DIR}/Singularity\"" ; exit 1; }
         echo "DEF_DIR=${DEF_DIR}" >> $GITHUB_ENV
 
-        IMAGE_TAG="${{ inputs.image_tag }}"
-        IMAGE_TAG="${IMAGE_TAG:-latest}"
+        all_image_tags=()
+        all_image_tags+=("${{ inputs.image_tags }}")
+
+        IMAGE_TAG="${all_image_tags[0]:-latest}"
         echo "Container tag is \"${IMAGE_TAG:-}\""
         echo "IMAGE_TAG="${IMAGE_TAG}"" >> $GITHUB_ENV
 
@@ -148,7 +150,7 @@ jobs:
         apptainer remote login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} oras://ghcr.io
         apptainer push -U "sif/${IMAGE_NAME}.sif" oras://ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} || { echo "Failed to push \"sif/${IMAGE_NAME}.sif\' to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"; exit 1; }
         echo "Pushed \"sif/${IMAGE_NAME}.sif\" to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
-
+        
         # Add "latest" tag if IMAGE_TAG is not latest
         if [[ "${IMAGE_TAG}" != "latest" ]]; then
           oras login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} ghcr.io
