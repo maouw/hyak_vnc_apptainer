@@ -6,14 +6,22 @@ on:
       image_name:
         description: 'Name of the container to build and deploy'
         required: true
+        type: string
       image_tag:
-        description: 'Tag of the container to build and deploy'
+        description: 'Tags of the container to build and deploy'
         required: false
         default: 'latest'
+        type: string
       base_image_tag:
         description: 'Tag of the base image to use'
         required: false
         default: 'latest'
+        type: string
+      build_args:
+        description: 'Build arguments to pass to the container build'
+        required: false
+        default: ''
+        type: string
 
 defaults:
   run:
@@ -77,6 +85,10 @@ jobs:
         echo "BOOTSTRAP_FROM_REPO=ghcr.io/${{ github.repository }}" >> "${DEF_DIR}/.build-arg-file"
         echo "BOOTSTRAP_FROM_SUFFIX=:${BASE_IMAGE_TAG:-latest}" >> "${DEF_DIR}/.build-arg-file"
 
+        if [[ -n "${{ inputs.build_args }}" ]]; then
+          echo "Found build args: \"${{ inputs.build_args }}\""
+          echo "${{ inputs.build_args }}" >> "${DEF_DIR}/.build-arg-file"
+        fi
         echo ".build-arg-file contents:"
         cat "${DEF_DIR}/.build-arg-file" 2>/dev/null || echo "No build-arg-file found."
 
@@ -142,3 +154,5 @@ jobs:
           oras login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} ghcr.io
           oras tag ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} latest
         fi
+
+        
