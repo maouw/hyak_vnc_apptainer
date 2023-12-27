@@ -130,12 +130,11 @@ jobs:
     - name: Build Container
       run: |
         set -euxo pipefail
-        export APPTAINER_CACHE_DIR="${SETUP_DOWNLOADS_DIR}/apptainer-cache"
         mkdir -p sif
         pushd  "${DEF_DIR}"
         echo "Building \"${IMAGE_NAME}.sif\""
         touch .build-arg-file
-        apptainer build --warn-unused-build-args --fix-perms --force --build-arg-file .build-arg-file ../../sif/"${IMAGE_NAME}.sif" Singularity || { echo "Failed to build \"${IMAGE_NAME}.sif\""; exit 1; }
+        apptainer build --warn-unused-build-args --disable-cache --fix-perms --force --build-arg-file .build-arg-file ../../sif/"${IMAGE_NAME}.sif" Singularity || { echo "Failed to build \"${IMAGE_NAME}.sif\""; exit 1; }
         echo "Built \"${IMAGE_NAME}.sif\""
         popd
     - name: Login and Deploy Container

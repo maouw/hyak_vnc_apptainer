@@ -12,6 +12,7 @@ From: {{BOOTSTRAP_FROM_REPO}}/{{BOOTSTRAP_FROM_IMAGE}}{{BOOTSTRAP_FROM_SUFFIX}}
 	SETUP_DOWNLOADS_DIR=../../.setup-downloads
 	RECON_ALL_CLINICAL_HASH=ecdf46e
 	RECON_ALL_CLINICAL_URL=https://raw.githubusercontent.com/freesurfer/freesurfer/{{RECON_ALL_CLINICAL_HASH}}/recon_all_clinical/recon-all-clinical.sh
+  MCR_VERSION=R2014b
 
 %help
 This is an Apptainer container of Ubuntu 22.04 with FreeSurfer installed. It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
@@ -53,6 +54,13 @@ This is an Apptainer container of Ubuntu 22.04 with FreeSurfer installed. It is 
 		"{{RECON_ALL_CLINICAL_URL}}" || { echo "warning: curl failed!" >&2; exit 1; }
 	chmod a+x /usr/local/freesurfer/{{FREESURFER_VERSION}}/bin/recon-all-clinical.sh
 
+  if [[ -n "{{ MCR_VERSION }}" ]; then
+    # Install MCR dependencies:
+    apt-get install -y libxt-dev libxext-dev libncurses5
+    
+    # Install MCR:
+    fs_install_mcr "{{MCR_VERSION}}"
+  fi
 	# Clean up packages:
 	apt-get clean -y -qq && apt-get -y autoremove && rm -rf /var/lib/apt/lists/*
 
@@ -81,4 +89,3 @@ This is an Apptainer container of Ubuntu 22.04 with FreeSurfer installed. It is 
 	edu.uw.hyakvnc.container.resources.recommends.cpus 4
 	edu.uw.hyakvnc.container.resources.requires.cpus 1
 	edu.uw.hyakvnc.container.resources.suggests.gpus 1
-
