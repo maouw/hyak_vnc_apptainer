@@ -50,7 +50,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ env.SETUP_DOWNLOADS_DIR }}
-        key: ${{ runner.os }}
+        key: ${{ runner.os }}-${{ inputs.image_name }}
     - name: Get container name
       run: |
         set -euxo pipefail
@@ -93,19 +93,79 @@ jobs:
         fi
         echo ".build-arg-file contents:"
         cat "${DEF_DIR}/.build-arg-file" 2>/dev/null || echo "No build-arg-file found."
-
-    - name: Delete GitHub AGENT_TOOLSDIRECTORY to free space
+    - name: Delete misc tools to free space
       run: |
-        set -euxo pipefail
-        echo "Disk space before:" && df -hl
-        sudo rm -rf /opt/hostedtoolcache; echo "Done removing /opt/hostedtoolcache"
-        echo "Disk space after:" && df -hl
-    - name: Delete .NET, Android, Haskell tools to free space
+        set -uxo pipefail
+        echo "Disk space before:" && df -hlT -x tmpfs
+        sudo rm -rf \
+          /opt/hostedtoolcache \
+          /usr/share/dotnet \
+          /opt/ghc \
+          /usr/local/lib/android \
+          /usr/local/share/powershell \
+          /usr/share/swift \
+          /usr/local/.ghcup \
+          /usr/lib/jvm || true
+        echo "Disk space after:" && df -hlT -x tmpfs
+        echo
+    - name: Remove packages to free space
       run: |
-        set -euxo pipefail
-        echo "Disk space before:" && df -hl
-        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android && echo "Done removing .NET, Android, and Haskell tools."
-        echo "Disk space after:" && df -hl
+        echo "Disk space before:" && df -hlT -x tmpfs
+        set -uxo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        for x in \
+          aria2 \
+          ansible \
+          azure-cli \
+          shellcheck \
+          rpm \
+          xorriso \
+          zsync \
+          esl-erlang \
+          firefox \
+          gfortran-8 \
+          gfortran-9 \
+          google-chrome-stable \
+          google-cloud-sdk \
+          imagemagick \
+          libmagickcore-dev \
+          libmagickwand-dev \
+          libmagic-dev \
+          ant \
+          ant-optional \
+          kubectl \
+          mercurial \
+          apt-transport-https \
+          mono-complete \
+          libmysqlclient \
+          unixodbc-dev \
+          yarn \
+          chrpath \
+          libssl-dev \
+          libxft-dev \
+          libfreetype6 \
+          libfreetype6-dev \
+          libfontconfig1 \
+          libfontconfig1-dev \
+          snmp \
+          pollinate \
+          libpq-dev \
+          postgresql-client \
+          powershell \
+          ruby-full \
+          sphinxsearch \
+          subversion \
+          mongodb-org \
+          azure-cli \
+          microsoft-edge-stable \
+          google-cloud-sdk \
+        ; do
+          sudo apt-get purge -y -p "${x}" >/dev/null 2>&1 || true
+        done
+        sudo apt-get autoremove -y >/dev/null 2>&1 
+        sudo apt-get autoclean -y >/dev/null 2>&1
+        echo "Disk space after:" && df -hlT -x tmpfs
+        echo
     - name: Download and Install Apptainer
       run: |
         set -euxo pipefail
@@ -155,5 +215,3 @@ jobs:
           oras login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} ghcr.io
           oras tag ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} latest
         fi
-
-        

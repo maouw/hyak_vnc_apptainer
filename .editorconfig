@@ -1,0 +1,19 @@
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.{md,html}]
+indent_style = space
+indent_size = 4
+
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+[Singularity,Apptainer,*.def]
+indent_style = tab
+indent_size = 4
+
+[*.{sh,bash}]
+indent_style = tab
+indent_size = 4
