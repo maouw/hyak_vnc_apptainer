@@ -111,7 +111,7 @@ jobs:
     - name: Remove packages to free space
       run: |
         echo "Disk space before:" && df -hlT -x tmpfs
-        set -uxo pipefail
+        set -uo pipefail
         export DEBIAN_FRONTEND=noninteractive
         for x in \
           aria2 \
@@ -160,7 +160,7 @@ jobs:
           microsoft-edge-stable \
           google-cloud-sdk \
         ; do
-          sudo apt-get purge -y -p "${x}" >/dev/null 2>&1 || true
+          sudo apt-get purge -y "${x}" >/dev/null 2>&1 || true
         done
         sudo apt-get autoremove -y >/dev/null 2>&1 
         sudo apt-get autoclean -y >/dev/null 2>&1
@@ -204,7 +204,7 @@ jobs:
         echo "Container size:"
         du -h "sif/${IMAGE_NAME}.sif"
         echo "Disk usage:"
-        df -h
+        df -hlt -x tmpfs
         echo "Pushing \"sif/${IMAGE_NAME}.sif\" to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"
         apptainer remote login -u ${{ github.actor }} -p ${{ secrets.TOKEN }} oras://ghcr.io
         apptainer push -U "sif/${IMAGE_NAME}.sif" oras://ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} || { echo "Failed to push \"sif/${IMAGE_NAME}.sif\' to ghcr.io/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}"; exit 1; }
