@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 [[ "${XDEBUG:-0}" =~ ^[1yYtT] ]] && set -x
-set -o errtrace -o nounset -o pipefail
-shopt -qs lastpipe inherit_errexit
-
+#set -o errtrace -o nounset -o pipefail
+#shopt -qs lastpipe inherit_errexit
+set -o errtrace
 PROGNAME="${0##*/}"
 VERBOSE="${VERBOSE:-0}"
 PROG_VERSION="0.0.1"
@@ -17,9 +17,10 @@ OSTYPE="${OSTYPE:-$(uname -s || true)}"
 PLATFORM="${PLATFORM:-${OSTYPE}-${HOSTTYPE}}"
 
 export TVNC_WM="${TVNC_WM:-xfce}"
-export VNC_PASSWORD="${VNC_PASSWORD:-password}"
-export VNC_DISPLAY="${VNC_DISPLAY:-:10}"
-export VNC_USER_DIR="${VNC_USER_DIR:-/tmp/${USER}-vnc}"
+export VNC_PASSWORD="${VNC_PASSWORD:-${HYAKVNC_VNC_PASSWORD:-password}}"
+export VNC_DISPLAY="${VNC_DISPLAY:-${HYAKVNC_VNC_DISPLAY:-:10}}"
+#export VNC_USER_DIR="${VNC_USER_DIR:-/tmp/${USER}-vnc}"
+export VNC_USER_DIR="${VNC_USER_DIR:-${HYAKVNC_VNC_USER_DIR:-/vnc}}"
 export VNC_FG="${VNC_FG:-1}"
 export VNC_LOG="${VNC_LOG:-${VNC_USER_DIR}/vnc.log}"
 export VNC_SOCKET="${VNC_SOCKET:-${VNC_USER_DIR}/socket.uds}"
@@ -181,7 +182,7 @@ function run_hyakvnc_vncserver() {
 
 	# Set other arguments:
 	[[ -n "${VNC_FG:-}" ]] && set -- -fg "${@}"
-	[[ -n "${VNC_LOG:-}" ]] && set -- -_errecho "${VNC_LOG}" "${@}"
+	[[ -n "${VNC_LOG:-}" ]] && set -- -log "${VNC_LOG}" "${@}"
 	[[ -n "${VNC_DISPLAY:-}" ]] && set -- "${VNC_DISPLAY}" "${@}"
 
 	[[ -n "${!VNC_@}" ]] && export "${!VNC_@}"
@@ -195,4 +196,4 @@ function run_hyakvnc_vncserver() {
 	vncserver "${@}"
 }
 
-! (return 0 2>/dev/null) || run_hyakvnc_vncserver "$@"
+(return 0 2>/dev/null) || run_hyakvnc_vncserver "$@"

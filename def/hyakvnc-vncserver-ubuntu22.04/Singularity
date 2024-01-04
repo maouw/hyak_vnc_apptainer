@@ -5,154 +5,35 @@ From: ubuntu:22.04
 This is an Apptainer container of Ubuntu 22.04 with TurboVNC and XFCE installed. It is intended to be used as a base for other containers that need a VNC server. It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
 
 %arguments
-	TURBOVNC_VERSION=3.1
-	TURBOVNC_DOWNLOAD_URL=https://sourceforge.net/projects/turbovnc/files/{{TURBOVNC_VERSION}}/turbovnc_{{TURBOVNC_VERSION}}_amd64.deb
-	TURBOVNC_DOWNLOAD_FILENAME=turbovnc_{{TURBOVNC_VERSION}}_amd64.deb
-	SETUP_DOWNLOADS_DIR=../../.setup-downloads
+# SETUP_DOWNLOADS_MOUNT [optional] [default: "/opt/.setup-downloads"] The path to the directory where the setup files will be downloaded. This directory should be mounted as a volume in the container.
+  SETUP_DOWNLOADS_MOUNT="/opt/.setup-downloads"
 
 %setup
-	[ -n "${APPTAINER_ROOTFS:-}" ] && ../../bin/write-apptainer-labels.sh > "${APPTAINER_ROOTFS}/.build_labels"
-	mkdir -p "{{SETUP_DOWNLOADS_DIR}}"
-	if ! [ -r "{{SETUP_DOWNLOADS_DIR}}/{{TURBOVNC_DOWNLOAD_FILENAME}}" ]; then
-		command -v curl >/dev/null 2>&1 || { echo "warning: curl not found!" >&2; exit 1; }
-		curl --fail --fail-early --compressed --location \
-			--continue-at - \
-			--output "{{SETUP_DOWNLOADS_DIR}}/{{TURBOVNC_DOWNLOAD_FILENAME}}" \
-			"{{TURBOVNC_DOWNLOAD_URL}}" || { echo "warning: curl failed!" >&2; rm -fv "{{SETUP_DOWNLOADS_DIR}}/TURBOVNC_DOWNLOAD_FILENAME}}" >&2; exit 1; }
-		echo "Downloaded \"{{TURBOVNC_DOWNLOAD_FILENAME}}\" from \"{{TURBOVNC_DOWNLOAD_URL}}\"."
-	fi
-	ln -v "{{SETUP_DOWNLOADS_DIR}}/{{TURBOVNC_DOWNLOAD_FILENAME}}" "${APPTAINER_ROOTFS}/turbovnc.deb" || { echo "warning: ln failed!" >&2; exit 1; }
+	../../bin/write-apptainer-labels.sh > "${APPTAINER_ROOTFS}/.build_labels"
+  [ -n "${SETUP_DOWNLOADS_MOUNT:-}" ] && export SETUP_DOWNLOADS_MOUNT="${SETUP_DOWNLOADS_MOUNT}" && mkdir -p "${APPTAINER_ROOTFS}/${SETUP_DOWNLOADS_MOUNT}"
 
 %labels
-	edu.uw.hyakvnc.container.resources.recommends.mem 4G
-	edu.uw.hyakvnc.container.resources.requires.mem 4G
-	edu.uw.hyakvnc.container.resources.recommends.cpus 2
+	edu.uw.hyakvnc.container.resources.recommends.mem 2G
+	edu.uw.hyakvnc.container.resources.requires.mem 2G
+	edu.uw.hyakvnc.container.resources.recommends.cpus 1
 	edu.uw.hyakvnc.container.resources.requires.cpus 1
 	
 %files
-	../../common/configs/ubuntu /opt/setup/configs
-	./hyakvnc-vncserver.sh /opt/local/bin/hyakvnc-vncserver
+  ../../common /opt/setup
 
 %post
-{
-	set -eux
-	export DEBIAN_FRONTEND=noninteractive
+	set -x
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y -qq
 
-	apt-get update -y -qq
-	apt-get install -y -qq \
-		apt-utils \
-		apt-transport-https \
-		localepurge
-
-	# Don't generate these locales"
-	mkdir -p /var/lib/locales/supported.d
-	for localename in fr de zh-hant ja es it zh-hans pt ru ar; do
-		touch "/var/lib/locales/supported.d/${localename}" && chmod a-r "/var/lib/locales/supported.d/${localename}"
-	done
-
-	# Limit the English locales to en_US.UTF-8:
-	echo "en_US.UTF-8 UTF-8" > /var/lib/locales/supported.d/en && chmod a-r /var/lib/locales/supported.d/en
-
-	# Generate the locales
-	apt-get install -y locales
-	localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.utf8
-
-	# Set the locale environment variables permanently:
-	export LANG=en_US.utf8 && echo "LANG=\"${LANG}\"" >>/etc/environment
-	export LC_ALL=en_US.utf8 && echo "LC_ALL=\"${LC_ALL}\"" >>/etc/environment
-	export LC_COLLATE=C && echo "LC_COLLATE=\"${LC_COLLATE}\"" >>/etc/environment
-
-	# Stop apt from installing audio packages (they don't work on VNC):
-	apt-mark hold xfce4-pulseaudio-plugin pavucontrol pulseaudio pipewire pipewire-bin pipewire-pulse
-
-	# Install basic packages:
-	apt-get install -yq --no-install-recommends \
-		bash-completion \
-		bc \
-		binutils \
-		bzip2 \
-		curl \
-		dash \
-		ed \
-		file \
-		git \
-		less \
-		make \
-		nano \
-		netcat-openbsd \
-		openssh-client \
-		patch \
-		procps \
-		psmisc \
-		python3 \
-		rsync \
-		unzip \
-		vim-tiny \
-		zip
-
-	# Install XFCE and some apps:
-	apt-get install -yq --no-install-recommends \
-		at-spi2-core \
-		dbus-x11 \
-		elementary-xfce-icon-theme \
-		fonts-dejavu-core \
-		fonts-freefont-ttf \
-		fonts-ubuntu \
-		gettext \
-		greybird-gtk-theme \
-		libfile-mimeinfo-perl \
-		libnet-dbus-perl \
-		libnotify-bin \
-		libx11-protocol-perl \
-		libxfce4ui-utils \
-		mousepad \
-		novnc \
-		ristretto \
-		thunar \
-		thunar-archive-plugin \
-		thunar-volman \
-		x11-utils \
-		x11-xserver-utils \
-		xauth \
-		xclip \
-		xdg-user-dirs \
-		xdg-utils \
-		xfce4-appfinder \
-		xfce4-datetime-plugin \
-		xfce4-indicator-plugin \
-		xfce4-notes-plugin \
-		xfce4-notifyd \
-		xfce4-panel \
-		xfce4-screenshooter \
-		xfce4-session \
-		xfce4-settings \
-		xfce4-taskmanager \
-		xfce4-terminal \
-		xfce4-whiskermenu-plugin \
-		xfconf \
-		xfdesktop4 \
-		xfonts-base \
-		xfwm4 \
-		xterm
-	
-	# Set xfce4-terminal as default terminal emulator:
-	update-alternatives --set x-terminal-emulator /usr/bin/xfce4-terminal.wrapper
-
-	# Install TurboVNC:
-	dpkg --install --force-depends /turbovnc.deb && apt-get install --fix-broken --yes --quiet
-	unlink /turbovnc.deb
-
-	# shellcheck disable=SC2016
-	echo '$vncUserDir = "$ENV{VNC_USER_DIR}";' >>/etc/turbovncserver.conf
-	# Copy configs:
-	rsync -avi --no-p --no-g --chmod=ugo=rwX /opt/setup/configs/ /
+  # Install Ubuntu packages:
+  /opt/setup/install-hyakvnc-ubuntu22.04.sh || { echo "ERROR: install-hyakvnc-ubuntu22.04.sh failed!" >&2; exit 1; }
 
 	# Erase the setup files:
 	rm -rf /opt/setup
 
 	# Clean up packages:
-	apt-get clean -y -qq && rm -rf /var/lib/apt/lists/*
-}
+	apt-get clean -y -qq && apt-get -y autoremove && rm -rf /var/lib/apt/lists/*
 
 %environment
 	export LANG=en_US.utf8
@@ -162,11 +43,7 @@ This is an Apptainer container of Ubuntu 22.04 with TurboVNC and XFCE installed.
 	export PATH="/opt/local/bin:/opt/TurboVNC/bin:${PATH}"
 
 %runscript
-{
-	exec hyakvnc-vncserver "$@"
-}
+  hyakvnc-vncserver "$@"
 
 %startscript
-{
-	exec hyakvnc-vncserver "$@"
-}
+  hyakvnc-vncserver "$@"
