@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+
 [[ "${XDEBUG:-0}" =~ ^[1yYtT] ]] && set -x
-#set -o errtrace -o nounset -o pipefail
-#shopt -qs lastpipe inherit_errexit
-set -o errtrace
+set -o errexit -o errtrace -o nounset -o pipefail
+
 PROGNAME="${0##*/}"
 VERBOSE="${VERBOSE:-0}"
 PROG_VERSION="0.0.1"
@@ -17,34 +17,66 @@ OSTYPE="${OSTYPE:-$(uname -s || true)}"
 PLATFORM="${PLATFORM:-${OSTYPE}-${HOSTTYPE}}"
 
 export TVNC_WM="${TVNC_WM:-xfce}"
-export VNC_PASSWORD="${VNC_PASSWORD:-${HYAKVNC_VNC_PASSWORD:-password}}"
-export VNC_DISPLAY="${VNC_DISPLAY:-${HYAKVNC_VNC_DISPLAY:-:10}}"
-#export VNC_USER_DIR="${VNC_USER_DIR:-/tmp/${USER}-vnc}"
-export VNC_USER_DIR="${VNC_USER_DIR:-${HYAKVNC_VNC_USER_DIR:-/vnc}}"
+
+export VNC_PASSWORD="${HYAKVNC_PASSWORD:-${VNC_PASSWORD:-password}}"
+export VNC_DISPLAY="${HYAKVNC_DISPLAY:-${VNC_DISPLAY:-10}}"
+export VNC_USER_DIR="${VNC_USER_DIR:-/vnc}"
 export VNC_FG="${VNC_FG:-1}"
 export VNC_LOG="${VNC_LOG:-${VNC_USER_DIR}/vnc.log}"
 export VNC_SOCKET="${VNC_SOCKET:-${VNC_USER_DIR}/socket.uds}"
 export VNC_PORT="${VNC_PORT:-}"
 
 function _errecho() {
-	[[ "${1:-}" == "--verbose" ]] && { shift; [[ "${VERBOSE:-0}" == 0 ]] && return 0; }
-	printf >&2 "[%b] %b\n" "${PROGNAME}" "$*" || true
+	local timestamp
+	timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+	printf "%s %b\n" "${timestamp}" "$*" >&2 || true
+	return 0
+}
+
+function _verrecho() {
+	_errecho "$*"
 	return 0
 }
 
 function _errexit() {
-	local status="${?:-}"
-	_errecho "$@"
-	exit "${status:-1}"
+	_errecho "ERROR: $*"
+	exit 1
 }
 
-function _errhandler_() {
-	local status="${?:-}"
-	local msg=""
-	[[ -n "${1:-}" ]] && msg=": $1"
-	printf >&2 "[%s:L%s]  Command \"%b\" failed with status %b%b\n" "${PROGNAME}" "${BASH_LINENO[0]:-?}" "${BASH_COMMAND[0]:-}" "${status:-"?"}" "${msg:-}" || true
-	exit "${status:-1}"
+function _trap_err() {
+	# shellcheck disable=SC2319
+	local _exit_code="$?"
+	local _command="${BASH_COMMAND:-unknown}"
+
+	(($# >= 1)) && [[ -n "${1:-}" ]] && _command="$1"
+	(($# >= 2)) && [[ -n "${2:-}" ]] && _exit_code="$2"
+
+	local -i start=$((${1:-0} + 1))
+	local -i end=${#BASH_SOURCE[@]}
+	local -i i=0
+	local -i j=0
+	_errecho "ERROR: ${_command} failed with exit code ${_exit_code}"
+	for ((i = start; i < end; i++)); do
+		j=$((i - 1))
+		local indent=""
+		for ((k = 0; k < i; k++)); do
+			indent+="  "
+		done
+		local function="${FUNCNAME[${i}]}"
+		local file="${BASH_SOURCE[${i}]}"
+		local line="${BASH_LINENO[${j}]}"
+		echo >&2 "${indent}${file}:${line}${function:+ in function ${function}()}"
+	done
 }
+
+function _trap_exit() {
+	local _exit_code="$?"
+	local _command="${BASH_COMMAND:-unknown}"
+	[[ "${_exit_code:-0}" != 0 ]] && _err_handler "${_command}" "${_exit_code}"
+	exit "${_exit_code}"
+}
+
+trap _trap_err ERR
 
 function _cleanup_vncserver() {
 	[[ -n "${VNC_SOCKET:-}" ]] && [[ -S "${VNC_SOCKET}" ]] && { rm -rfv "${VNC_SOCKET}" 2>/dev/null || true; }
@@ -52,9 +84,7 @@ function _cleanup_vncserver() {
 	return 0
 }
 
-function _write_vnc_log() {
-	[[ -n "${VNC_LOG:-}" ]] && [[ -f "${VNC_LOG}" ]] && { tail -v "${VNC_LOG}" | sed -E "s/^/${PROGNAME}: /" >&2 && echo >&2 "${PROGNAME}: End of log"; }
-}
+trap '_cleanup_vncserver; _trap_exit' EXIT
 
 function show_help() {
 	expand -t 4 <<EOF
@@ -64,11 +94,10 @@ Usage: ${PROGNAME} [options] -- <vncserver args>
 	--password <password>	Set the VNC password (default: password)
 	--display <display>		Set the VNC display (default: :10)	
 	--user-dir <dir>		Set the VNC directory (default: /tmp/${USER}-vnc)
-	--log-file <file>		Set the VNC _errecho file (default: "${VNC_USER_DIR}/vnc.log")
+	--log <file>		Set the VNC _errecho file (default: "${VNC_USER_DIR}/vnc.log")
 	--socket <socket>		Set the VNC Unix socket (default: ${VNC_USER_DIR}/socket.uds)
 	--port <port>			Set the VNC port (default: unset, use Unix socket)
 	--foreground | --fg		Run in the foreground (default)
-	--background | --bg		Run in the background
 	--wm <wm>				Set the window manager (default: xfce)
 	--verbose				Verbose output
 	--trace					Debug output
@@ -95,7 +124,7 @@ EOF
 function run_hyakvnc_vncserver() {
 	# Parse arguments:
 	while (($# > 0)); do
-		case ${1:-} in
+		case "${1:-}" in
 			--?*=* | -?*=*) # Handle --flag=value args
 				set -- "${1%%=*}" "${1#*=}" "${@:2}"
 				continue
@@ -104,39 +133,22 @@ function run_hyakvnc_vncserver() {
 			--verbose) export VERBOSE=1 ;;
 			-h | --help) show_help; return 0 ;;
 			--version) echo "${PROGNAME} version ${PROG_VERSION:-}"; return 0 ;;
-			--password)
-				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
-				export VNC_PASSWORD="${1:-}"
+			--password | --display | --user-dir | --log | --socket | --port)
+				local argcap="${1#--}"  # Remove leading "--"
+				argcap="${argcap//-/_}" # Replace "-" with "_"
+				argcap="${argcap^^}"    # Convert to uppercase
+				shift || { _errecho ERROR "$1 requires an argument"; exit 1; }
+				export "VNC_${argcap}"="$1"
 				;;
-			--display)
-				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
-				export VNC_DISPLAY="$1"
+			--foreground | --fg)
+				export VNC_FG=1
 				;;
-			--user-dir)
-				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
-				export VNC_USER_DIR="$1"
-				;;
-			--log-file)
-				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
-				export VNC_LOG="$1"
-				;;
-			--socket)
-				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
-				export VNC_SOCKET="$1"
-				;;
-			--port)
-				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
-				export VNC_PORT="$1"
-				unset VNC_SOCKET
-				;;
-			--foreground | --fg) export VNC_FG=1 ;;
-			--background | --bg) export VNC_FG=0 ;;
 			--wm)
-				shift || { _errecho ERROR "$1 requires an argument"; return 1; }
+				shift || { _errecho ERROR "$1 requires an argument"; exit 1; }
 				export TVNC_WM="$1"
 				;;
 			-? | --?*) # Handle unrecognized options
-				_errecho "Unknown option \"${1:-}\""
+				_errecho ERROR "Unknown option \"${1:-}\""
 				break
 				;;
 			*)
@@ -147,35 +159,36 @@ function run_hyakvnc_vncserver() {
 		shift
 	done
 
-	# Trap errors:
-	trap _errhandler_ ERR
-
-	_errecho --verbose "Running as \"${USER:-$(id -un || true)}\" with UID \"${UID:-$(id -u || true)}\" and GID \"${GID:-$(id -g || true)}\""
+	_verrecho "Running as \"${USER:-$(id -un || true)}\" with UID \"${UID:-$(id -u || true)}\" and GID \"${GID:-$(id -g || true)}\""
 
 	# Set up the VNC directory
 	[[ -n "${VNC_USER_DIR:-}" ]] || _errexit "VNC directory \"${VNC_USER_DIR:-}\" is not set."
-	[[ -d "${VNC_USER_DIR:-}" ]] || mkdir -p -m 700 "${VNC_USER_DIR}"
+	[[ -d "${VNC_USER_DIR:-}" ]] || { mkdir -p "${VNC_USER_DIR}"; chmod -R 700 "${VNC_USER_DIR}"; }
 	[[ -w "${VNC_USER_DIR}" ]] || _errexit "VNC directory \"${VNC_USER_DIR}\" is not writable."
-	_errecho --verbose "\$VNC_USER_DIR=\"${VNC_USER_DIR}\""
+	_verrecho "\$VNC_USER_DIR=\"${VNC_USER_DIR}\""
 
-	echo "${VNC_PASSWORD:-}" | vncpasswd -f >"${VNC_USER_DIR}/passwd"
-	chmod 600 "${VNC_USER_DIR}/passwd"
-	_errecho --verbose "Set VNC password to \"${VNC_PASSWORD:-}\""
+	# Set up the VNC password
+	if ! [[ -r "${VNC_USER_DIR}/passwd" ]]; then
+		echo "${VNC_PASSWORD:-}" | vncpasswd -f >"${VNC_USER_DIR}/passwd" && chmod 600 "${VNC_USER_DIR}/passwd"
+		_verrecho "Set VNC password to \"${VNC_PASSWORD:-}\""
+	fi
 
-	local hostname
-	[[ -n "${hostname:-}" ]] || hostname="$(uname -n)" || hostname="${HOST:-}" || _errexit "Could not determine hostname."
-	[[ -n "${hostname:-}" ]] && echo "${hostname}" >"${VNC_USER_DIR}/hostname"
-	_errecho --verbose "Set hostname to \"${hostname}\""
-	printenv >"${VNC_USER_DIR}/environment"
+	# Set up the hostname
+	hostname="${hostname:-${HOST}}"
+	echo "${hostname}" >"${VNC_USER_DIR}/hostname"
+	_verrecho "Set hostname to \"${hostname}\""
+	printenv >|"${VNC_USER_DIR}/environment"
 
 	# Set port or socket:
 	if [[ -n "${VNC_PORT:-}" ]]; then
 		# Validate port:
 		if ! { [[ "${VNC_PORT}" =~ ^[0-9]+$ ]] && [[ "${VNC_PORT}" -lt 1 ]] && [[ "${VNC_PORT}" -gt 65535 ]]; }; then
-			_errexit --verbose "VNC port \"${VNC_PORT}\" is invalid."
+			_errexit "VNC port \"${VNC_PORT}\" is invalid."
 		fi
+
 		set -- -rfbport "${VNC_PORT}" "${@}"
 		echo "${VNC_PORT}" >"${VNC_USER_DIR}/port"
+		unset VNC_SOCKET
 	elif [[ -n "${VNC_SOCKET:-}" ]]; then
 		set -- -rfbunixpath "${VNC_SOCKET}" "${@}"
 	fi
@@ -188,11 +201,7 @@ function run_hyakvnc_vncserver() {
 	[[ -n "${!VNC_@}" ]] && export "${!VNC_@}"
 	[[ -n "${TVNC_WM:-}" ]] && export TVNC_WM="${TVNC_WM}"
 
-	_ERR_WRITE_LOG=1 # Write _errecho on exit
-	retval=0         # Declare retval for exit trap
-
-	trap 'retval=$?; trap - EXIT; _cleanup_vncserver; _write_vnc_log; >&2 echo "${PROGNAME}: Exiting (status: ${retval:-0})"; exit ${retval:-0}' EXIT
-	_errecho --verbose "Starting vncserver with arguments \"${*}\""
+	_verrecho "Starting vncserver with arguments \"${*}\""
 	vncserver "${@}"
 }
 
