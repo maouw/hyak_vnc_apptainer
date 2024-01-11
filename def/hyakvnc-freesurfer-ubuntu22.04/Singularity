@@ -29,32 +29,48 @@ This is an Apptainer container of Ubuntu 22.04 with FreeSurfer installed. It is 
 	../../common/configs/freesurfer/freeview.desktop /usr/share/applications/freeview.desktop
 
 %post
-	set -x
-  export DEBIAN_FRONTEND=noninteractive
-  export DOWNLOAD_DIR="${DOWNLOAD_DIR:-${SETUP_DOWNLOADS_MOUNT:-/opt/.setup-downloads}}" && mkdir -p "${DOWNLOAD_DIR}" && ls -la "${DOWNLOAD_DIR}"
+	export DOWNLOAD_DIR="${DOWNLOAD_DIR:-${SETUP_DOWNLOADS_MOUNT:-/opt/.setup-downloads}}" && mkdir -p "${DOWNLOAD_DIR}" && ls -la "${DOWNLOAD_DIR}"
 
-  apt-get update -y -qq
+	export LANG=en_US.UTF-8
+	export LC_ALL=en_US.UTF-8
+	export LC_COLLATE=C
 
-  # Install Ubuntu packages:
-  /opt/setup/scripts/install-hyakvnc-ubuntu22.04.sh || { echo "ERROR: install-hyakvnc-ubuntu22.04.sh failed!" >&2; exit 1; }
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update -y -qq
 
-  # Install FreeSurfer:
-  /opt/setup/scripts/install-freesurfer.sh || { echo "ERROR: install-freesurfer.sh failed!" >&2; exit 1; }
+	# Install base packages:
+	/opt/setup/scripts/install-ubuntu22.04-base.sh || { echo "warning: install-ubuntu22.04-base.sh failed!" >&2; exit 1; }
 
-	# Link /usr/local/freesurfer/dev to /usr/local/freesurfer/{{FREESURFER_VERSION}}:
+	# Install hyakvnc dependencies and hyakvnc:
+	/opt/setup/scripts/install-ubuntu22.04-hyakvnc-vncserver.sh || { echo "warning: install-ubuntu22.04-hyakvnc-vncserver.sh failed!" >&2; exit 1; }
+	/opt/setup/scripts/install-ubuntu22.04-xfce.sh || { echo "warning: install-ubuntu22.04-xfce.sh failed!" >&2; exit 1; }
+
+	# Install FreeSurfer:
+	/opt/setup/scripts/install-freesurfer.sh || { echo "ERROR: install-freesurfer.sh failed!" >&2; exit 1; }
+
+	# Install FreeSurfer:
+	/opt/setup/scripts/install-freesurfer.sh || { echo "ERROR: install-freesurfer.sh failed!" >&2; exit 1; }
+	export FREESURFER_HOME="/usr/local/freesurfer/{{FREESURFER_VERSION}}"
+	[ -d "${FREESURFER_HOME}" ] || { echo "ERROR: FREESURFER_HOME directory not found!" >&2; exit 1; }
+
+	# Link /usr/local/freesurfer/dev to "${FREESURFER_HOME}"
 	# (fixes some scripts that expect this)
-	ln -s "/usr/local/freesurfer/{{FREESURFER_VERSION}}" /usr/local/freesurfer/dev
+	ln -s "${FREESURFER_HOME}" /usr/local/freesurfer/dev
 
 	# Patch recon-all-clinical.sh to fix a bug with FREESURFER_HOME location:
-	[ -n "{{RECON_ALL_CLINICAL_URL}}" ] && curl --fail --fail-early --compressed --location \
-		--output /usr/local/freesurfer/{{FREESURFER_VERSION}}/bin/recon-all-clinical.sh \
-		"{{RECON_ALL_CLINICAL_URL}}" || { echo "warning: curl failed!" >&2; exit 1; }
-	chmod a+x /usr/local/freesurfer/{{FREESURFER_VERSION}}/bin/recon-all-clinical.sh
+	if [ -n "{{RECON_ALL_CLINICAL_URL}}" ]; then
+		curl --fail-early --compressed --location --output "${FREESURFER_HOME}/bin/recon-all-clinical.sh" "{{RECON_ALL_CLINICAL_URL}}" || { echo "warning: curl failed!" >&2; exit 1; }
+		chmod a+x /usr/local/freesurfer/{{FREESURFER_VERSION}}/bin/recon-all-clinical.sh
+	fi
 
+	# Install Matlab Compiler Runtime (MCR) if requested:
+  if [ -n "{{MCR_VERSION}}" ]; then
+    # Install MCR dependencies:
+    apt-get install -y libxt-dev libxext-dev libncurses5
+		export MCR_VERSION="{{MCR_VERSION}}"
+		/opt/setup/scripts/install-fs-mcr.sh || { echo "ERROR: install-fs-mcr.sh failed!" >&2; exit 1; }
+   fi
 
-  export FREESURFER_HOME="/usr/local/freesurfer/{{FREESURFER_VERSION}}"
-
-  [ -d "${FREESURFER_HOME}" ] || { echo "ERROR: FREESURFER_HOME directory not found!" >&2; exit 1; }
 
   # Set up the environment by sourcing the FreeSurfer setup script, filtering out the environment variables that are already set in the container, and writing the remaining environment variables to the /.singularity.d/env directory:
     printenv | grep -oE '.*='  | tr -d '=' | sort | uniq  > /tmp/current_env_names.txt
@@ -71,17 +87,6 @@ This is an Apptainer container of Ubuntu 22.04 with FreeSurfer installed. It is 
   # Show the contents of the environment file:
     [ -f "/singularity.d/env/101-hyakvnc-freesurfer-env.sh" ] && echo >&2 "/singularity.d/env/101-hyakvnc-freesurfer-env.sh contents:" && cat "/singularity.d/env/101-hyakvnc-freesurfer-env.sh" >&2
   
-	# Install Matlab Compiler Runtime (MCR) if requested:
-  if [ -n "{{MCR_VERSION}}" ]; then
-    # Install MCR dependencies:
-    apt-get install -y libxt-dev libxext-dev libncurses5
-    
-		# Set the environment variables for fs_install_mcr to work:
-		export PATH="${FREESURFER_HOME}/bin:${PATH}"
-
-    # Install MCR:
-    fs_install_mcr "{{MCR_VERSION}}"
-  fi
 
 	# Erase the setup files:
 	rm -rf /opt/setup

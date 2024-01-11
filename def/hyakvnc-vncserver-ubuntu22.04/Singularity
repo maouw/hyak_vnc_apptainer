@@ -23,11 +23,20 @@ This is an Apptainer container of Ubuntu 22.04 with TurboVNC and XFCE installed.
 
 %post
 	set -x
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update -y -qq
+	export DOWNLOAD_DIR="${DOWNLOAD_DIR:-${SETUP_DOWNLOADS_MOUNT:-/opt/.setup-downloads}}" && mkdir -p "${DOWNLOAD_DIR}" && ls -la "${DOWNLOAD_DIR}"
 
-  # Install Ubuntu packages:
-  /opt/setup/install-hyakvnc-ubuntu22.04.sh || { echo "ERROR: install-hyakvnc-ubuntu22.04.sh failed!" >&2; exit 1; }
+	export LANG=en_US.UTF-8
+	export LC_ALL=en_US.UTF-8
+	export LC_COLLATE=C
+
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update -y -qq
+
+	# Install base packages:
+	/opt/setup/scripts/install-ubuntu22.04-base.sh || { echo "warning: install-ubuntu22.04-base.sh failed!" >&2; exit 1; }
+
+	# Install hyakvnc dependencies and hyakvnc:
+	/opt/setup/scripts/install-ubuntu22.04-hyakvnc-vncserver.sh || { echo "warning: install-ubuntu22.04-hyakvnc-vncserver.sh failed!" >&2; exit 1; }
 
 	# Erase the setup files:
 	rm -rf /opt/setup
@@ -35,12 +44,6 @@ This is an Apptainer container of Ubuntu 22.04 with TurboVNC and XFCE installed.
 	# Clean up packages:
 	apt-get clean -y -qq && apt-get -y autoremove && rm -rf /var/lib/apt/lists/*
 
-%environment
-	export LANG=en_US.utf8
-	export LC_ALL=en_US.utf8
-	export LC_COLLATE=C
-	export SHELL="${SHELL:-/bin/bash}"
-	export PATH="/opt/local/bin:/opt/TurboVNC/bin:${PATH}"
 
 %runscript
   hyakvnc-vncserver "$@"
