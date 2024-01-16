@@ -5,38 +5,32 @@ From: ubuntu:22.04
 This is an Apptainer container of Ubuntu 22.04 with TurboVNC and XFCE installed. It is intended to be used as a base for other containers that need a VNC server. It is designed to be run on the Hyak cluster at the University of Washington with the hyakvnc script.
 
 %arguments
-# SETUP_DOWNLOADS_MOUNT [optional] [default: "/opt/.setup-downloads"] The path to the directory where the setup files will be downloaded. This directory should be mounted as a volume in the container.
-  SETUP_DOWNLOADS_MOUNT="/opt/.setup-downloads"
+	# SETUP_DOWNLOADS_MOUNT [optional] [default: "/opt/.setup-downloads"]:
+	# The path to the directory where the setup files will be downloaded.
+	# This directory should be mounted as a volume in the container.
+	SETUP_DOWNLOADS_MOUNT=/opt/.setup-downloads
 
 %setup
-	../../bin/write-apptainer-labels.sh > "${APPTAINER_ROOTFS}/.build_labels"
-  [ -n "${SETUP_DOWNLOADS_MOUNT:-}" ] && export SETUP_DOWNLOADS_MOUNT="${SETUP_DOWNLOADS_MOUNT}" && mkdir -p "${APPTAINER_ROOTFS}/${SETUP_DOWNLOADS_MOUNT}"
+	# Set the default download directory to cache large downloads:
+	[ -n "{{SETUP_DOWNLOADS_MOUNT}}" ] && mkdir -p "${APPTAINER_ROOTFS}/{{SETUP_DOWNLOADS_MOUNT}}"
 
 %labels
 	edu.uw.hyakvnc.container.resources.recommends.mem 2G
 	edu.uw.hyakvnc.container.resources.requires.mem 2G
 	edu.uw.hyakvnc.container.resources.recommends.cpus 1
 	edu.uw.hyakvnc.container.resources.requires.cpus 1
-	
+
 %files
-  ../../common /opt/setup
+	../../common /opt/setup
 
 %post
-	set -x
-	export DOWNLOAD_DIR="${DOWNLOAD_DIR:-${SETUP_DOWNLOADS_MOUNT:-/opt/.setup-downloads}}" && mkdir -p "${DOWNLOAD_DIR}" && ls -la "${DOWNLOAD_DIR}"
-
-	export LANG=en_US.UTF-8
-	export LC_ALL=en_US.UTF-8
-	export LC_COLLATE=C
-
+	set -o errexit -o nounset -o xtrace
+	[ -n "{{SETUP_DOWNLOADS_MOUNT}}" ] && [ -d "{{SETUP_DOWNLOADS_MOUNT}}" ] && export DOWNLOAD_DIR="{{SETUP_DOWNLOADS_MOUNT}}" && ls -la "${DOWNLOAD_DIR}" || true
+	
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -y -qq
 
-	# Install base packages:
-	/opt/setup/scripts/install-ubuntu22.04-base.sh || { echo "warning: install-ubuntu22.04-base.sh failed!" >&2; exit 1; }
-
-	# Install hyakvnc dependencies and hyakvnc:
-	/opt/setup/scripts/install-ubuntu22.04-hyakvnc-vncserver.sh || { echo "warning: install-ubuntu22.04-hyakvnc-vncserver.sh failed!" >&2; exit 1; }
+	. /opt/setup/scripts/setup-ubuntu22.04-hyakvnc-vncserver.sh
 
 	# Erase the setup files:
 	rm -rf /opt/setup
@@ -46,7 +40,7 @@ This is an Apptainer container of Ubuntu 22.04 with TurboVNC and XFCE installed.
 
 
 %runscript
-  hyakvnc-vncserver "$@"
+	hyakvnc-vncserver "$@"
 
 %startscript
-  hyakvnc-vncserver "$@"
+	hyakvnc-vncserver "$@"
